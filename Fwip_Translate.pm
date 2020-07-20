@@ -1,5 +1,6 @@
 package Fwip_Translate;
 #    Copyright (C) 2017-2020 by Kevin D. Woerner
+# 2020-07-20 kdw  arraylast work
 # 2020-07-09 kdw  mode-extended rmd
 # 2020-06-22 kdw  comments on output rmed II
 # 2020-06-19 kdw  comments on output rmed
@@ -584,7 +585,7 @@ EOF
       fwipt_ls_inc($cond);
 #      my $awaitexit = "AWAIT_EXIT$zqqt_tr{ISS}${lv_cm0}";
 #      my $awaitexit = "$zqqt_word{AWAIT_EXIT};${lv_cm0}";
-      my $awaitexit = "AWAIT_EXIT; ${lv_cm0} KQS";
+      my $awaitexit = "AWAIT_EXIT; ${lv_cm0} loop AWAIT";
       my $prf = "";
       if ($cond =~ s/(\s+COUNT\b\s*(\S+)(.*))$//) {
          my %ff = (fwipt_countsplit($1));

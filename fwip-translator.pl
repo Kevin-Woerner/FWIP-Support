@@ -1,6 +1,7 @@
 #! /usr/bin/perl -W
 #    Copyright (C) 2015-2020 by Kevin D. Woerner
 # FWIP (Functions Written In Pseudocode) Processor
+# 2020-07-20 kdw  arraylast work
 # 2020-07-14 kdw  rmed unused code
 # 2020-07-09 kdw  mode-extended rmd
 # 2020-06-30 kdw  BC: const work
@@ -874,6 +875,9 @@ foreach (@input_lines) {
       die "$0:HAS LOG:$_\n";
    }
 
+   if (m/^\s*$rxp_vd\s+(\w+)\[(\d+)\];/) {
+      $array_size{$1} = $2 - 1;
+   }
    if (Fwip_Translate::fwipt_lang_is(LANG_UNITS)) {
       # UNITS --- ----- ----- ----- ----- ----- ----- ----- -----
       s/$rxp_mn//g;
@@ -904,7 +908,7 @@ foreach (@input_lines) {
       }
       while (m/ARRAYLAST\((\w+)\[\s*\]\)/) {
          if (!defined($array_size{$1})) {
-            die "ARRAY=$1";
+            die "PERL:array_size\{$1\} NOT DEFINED";
          }
          s/ARRAYLAST\((\w+)\[\s*\]\)/ $array_size{$1} /e;
       }
@@ -1010,7 +1014,7 @@ foreach (@input_lines) {
       }
       while (m/ARRAYLAST\((\w+)\[\s*\]\)/) {
          if (!defined($array_size{$1})) {
-            die "ARRAY=$1";
+            die "PYTHON:array_size\{$1\} NOT DEFINED";
          }
          s/ARRAYLAST\((\w+)\[\s*\]\)/ $array_size{$1} /e;
       }
@@ -1067,7 +1071,7 @@ foreach (@input_lines) {
       }
       while (m/ARRAYLAST\((\w+)\[\s*\]\)/) {
          if (!defined($array_size{$1})) {
-            die "ARRAY=$1";
+            die "VB6:array_size\{$1\} NOT DEFINED";
          }
          s/ARRAYLAST\((\w+)\[\s*\]\)/ $array_size{$1} /e;
       }
@@ -1196,7 +1200,7 @@ foreach (@input_lines) {
       }
       while (m/ARRAYLAST\((\w+)\[\s*\]\)/) {
          if (!defined($array_size{$1})) {
-            die "ARRAY=$1";
+            die "VBDOTNET:array_size\{$1\} NOT DEFINED";
          }
          s/ARRAYLAST\((\w+)\[\s*\]\)/ $array_size{$1} /e;
       }
@@ -1332,7 +1336,11 @@ foreach (@input_lines) {
       }
       while (m/ARRAYLAST\((\w+)\[\s*\]\)/) {
          if (!defined($array_size{$1})) {
-            die "ARRAY=$1";
+            foreach my $ky (keys %array_size) {
+               print STDERR "\narray_size\{$ky\}="
+                     . "$array_size{$ky}";
+            }
+            die "\nC/H/RPN:array_size\{$1\} NOT DEFINED";
          }
          s/ARRAYLAST\((\w+)\[\s*\]\)/ $array_size{$1} /e;
       }
@@ -1424,7 +1432,7 @@ foreach (@input_lines) {
       }
       while (m/ARRAYLAST\((\w+)\[\s*\]\)/) {
          if (!defined($array_size{$1})) {
-            die "ARRAY=$1";
+            die "BC:array_size\{$1\} NOT DEFINED";
          }
          s/ARRAYLAST\((\w+)\[\s*\]\)/ $array_size{$1} /e;
       }
