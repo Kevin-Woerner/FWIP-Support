@@ -1,5 +1,8 @@
 package Fwip_Translate;
 #    Copyright (C) 2017-2020 by Kevin D. Woerner
+# 2020-07-29 kdw  block-def work
+# 2020-07-25 kdw  s/BITWISE/BIT/
+# 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-07-20 kdw  arraylast work
 # 2020-07-09 kdw  mode-extended rmd
 # 2020-06-22 kdw  comments on output rmed II
@@ -209,7 +212,7 @@ my $zqbql;
    sub fwipt_ls_inc($ ) {
       $lv_lsprev = $lv_lscurr;
       $lv_lsnext .= ${zqbq};
-      if ($_[0] =~ m/\b(?:LOCAL_)?(FUNC)\b/) {
+      if ($_[0] =~ m/\b(?:BLOCK_)?(FUNC)\b/) {
          lf_vbx_push($1);
          $lv_lsfunc = $_[0];
       }
@@ -365,10 +368,10 @@ sub fwipt_lang_aint($;$$$$$$ )
    sub lf_zq_set_op($$$$$$$ )
    {
       $zqqt_op{MOD}        = $_[0];
-      $zqqt_op{BITWISEAND} = $_[1];
-      $zqqt_op{BITWISEOR}  = $_[2];
-      $zqqt_op{BITWISEXOR} = $_[3];
-      $zqqt_op{BITWISENOT} = $_[4];
+      $zqqt_op{BITAND} = $_[1];
+      $zqqt_op{BITOR}  = $_[2];
+      $zqqt_op{BITXOR} = $_[3];
+      $zqqt_op{BITNOT} = $_[4];
       $zqqt_op{BITSHIFTL}  = $_[5];
       $zqqt_op{BITSHIFTR}  = $_[6];
    }
@@ -647,8 +650,8 @@ EOF
          $st =~ s/ ($zqqt_oprxnotbc) \((\w+)\)/ $1 $2/g;
       }
 
-      while ($st =~ s/\bBITWISENOT\s*\(([^\)]+)\)
-                  /$zqqt_op{BITWISENOT}($1)/xsmg) {
+      while ($st =~ s/\bBITNOT\s*\(([^\)]+)\)
+                  /$zqqt_op{BITNOT}($1)/xsmg) {
          next;
       }
       $st;
@@ -672,7 +675,7 @@ EOF
          my %kw_fwip = ();
 
          foreach my $gg (qw(
-               FUNC FUNC_END LOCAL_FUNC
+               FUNC FUNC_END
                READONLY WRITEABLE WRITEONLY
                RETURN CALL DIE
                IF ELSIF ELSE IF_END
@@ -684,15 +687,13 @@ EOF
                ARRAY ARRAY_END REDIM ARRAYLAST
                ABS ABSL ATAN2 FLOOR CEIL EXP LN
                SIN COS TAN POW SQRT
-               CONST LOCAL_CONST
+               CONST
                PRINTSTR PRINTVAL
                LANGUAGE LANGUAGE_NOT LANGUAGE_END
-               IMPORT
+               IMPORT IMPORT_MASTER
                MODE_INTEGER MODE_INTEGER_END
-               MASTER
                DBL INT STR BOL NUL
-               LOCAL_USE
-               LOCAL_DBL LOCAL_INT LOCAL_STR LOCAL_BOL)) {
+               BLOCK_USE)) {
             if (!defined($kw_fwip{$gg})) {
                $fwipt_rx .= "|$gg";
             }
@@ -773,8 +774,8 @@ sub lf_lang_fwip ()
    ($lv_cm0, $lv_cm4) = Fwip_Comment::fwipc_set("#");
 
    lf_zq_set_zqqissdie(";", "DIE");
-   lf_zq_set_op("MOD", "BITWISEAND", "BITWISEOR"
-         , "BITWISEXOR", "BITWISENOT"
+   lf_zq_set_op("MOD", "BITAND", "BITOR"
+         , "BITXOR", "BITNOT"
          , "BITSHIFTL", "BITSHIFTR");
 
    lf_zq_set_zqq_tr( <<EOF);
@@ -799,12 +800,8 @@ AWAIT_END       AWAIT_END
 FUNC            FUNC
 FUNC_END        FUNC_END
 CALL            CALL
-LOCAL_USE       LOCAL_USE
-LOCAL_FUNC      LOCAL_FUNC
-LOCAL_BOL       LOCAL_BOL
-LOCAL_DBL       LOCAL_DBL
-LOCAL_INT       LOCAL_INT
-LOCAL_STR       LOCAL_STR
+BLOCK_USE       BLOCK_USE
+BLOCK_DEF       BLOCK_DEF
 BOL             BOL
 DBL             DBL
 INT             INT
@@ -867,12 +864,8 @@ AWAIT_END       }
 FUNC            sub
 FUNC_END        }
 CALL            ""
-LOCAL_USE       $lv_cm0 local-use Perl
-LOCAL_FUNC      ""
-LOCAL_BOL       my
-LOCAL_DBL       my
-LOCAL_INT       my
-LOCAL_STR       my
+BLOCK_USE       $lv_cm0 local-use Perl
+BLOCK_DEF       ""
 BOL             my
 DBL             my
 INT             my
@@ -926,12 +919,9 @@ AWAIT_END       ""
 FUNC            define
 FUNC_END        ""
 CALL            ""
-LOCAL_USE       global
-LOCAL_FUNC      ""
-LOCAL_BOL       ""
-LOCAL_DBL       ""
-LOCAL_INT       ""
-LOCAL_STR       ""
+BLOCK_USE       global
+BLOCK_STR       BLOCK_STR
+BLOCK_DEF       ""
 BOL             ""
 DBL             ""
 INT             ""
@@ -986,12 +976,8 @@ AWAIT_END       Loop
 FUNC            Public Function
 FUNC_END        End Function
 CALL            Call
-LOCAL_USE       $lv_cm0 local-use Vb6
-LOCAL_FUNC      Private
-LOCAL_BOL       Private Boolean
-LOCAL_DBL       Private Double
-LOCAL_INT       Private Long
-LOCAL_STR       Private String
+BLOCK_USE       $lv_cm0 local-use Vb6
+BLOCK_DEF       Private
 BOL             Boolean
 DBL             Double
 INT             Long
@@ -1047,12 +1033,8 @@ AWAIT_END       Loop
 FUNC            Public Shared Function
 FUNC_END        End Function
 CALL            Call
-LOCAL_USE       $lv_cm0 local-use Vbdotnet
-LOCAL_FUNC      Private Shared
-LOCAL_BOL       Private Boolean
-LOCAL_DBL       Private Double
-LOCAL_INT       Private Long
-LOCAL_STR       Private String
+BLOCK_USE       $lv_cm0 local-use Vbdotnet
+BLOCK_DEF       Private
 BOL             Boolean
 DBL             Double
 INT             Long
@@ -1107,12 +1089,8 @@ AWAIT_END       }
 FUNC            ""
 FUNC_END        }
 CALL            (void)
-LOCAL_USE       $lv_cm0 local-use C
-LOCAL_FUNC      static
-LOCAL_BOL       static long
-LOCAL_DBL       static double
-LOCAL_INT       static long
-LOCAL_STR       static char *
+BLOCK_USE       $lv_cm0 local-use C
+BLOCK_DEF       static
 BOL             long
 DBL             double
 INT             long
@@ -1164,12 +1142,8 @@ AWAIT_END       }
 FUNC            define
 FUNC_END        }
 CALL            bcdummy =
-LOCAL_USE       $lv_cm0 local-use Bc
-LOCAL_FUNC      ""
-LOCAL_BOL       auto
-LOCAL_DBL       auto
-LOCAL_INT       auto
-LOCAL_STR       auto
+BLOCK_USE       $lv_cm0 local-use Bc
+BLOCK_DEF       ""
 BOL             auto
 DBL             auto
 INT             auto
@@ -1201,7 +1175,7 @@ sub fwipt_initcode($ )
 
    if (fwipt_lang_is(LANG_FWIPP)) {
       (<<EndOfInitCodeBlockFwip);
-MASTER ${library_name};
+IMPORT_MASTER ${library_name};
 EndOfInitCodeBlockFwip
    } elsif (fwipt_lang_is(LANG_UNITS)) {
       (<<EndOfInitCodeBlockUnits);

@@ -1,5 +1,6 @@
 #! /usr/bin/perl -W
 #    Copyright (C) 2019-2020 by Kevin D. Woerner
+# 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-05-20 kdw  rmed unnecessary quotes
 # 2020-05-13 kdw  trivially changed
 # 2020-05-12 kdw  prettify output
@@ -133,7 +134,7 @@ for (my $ii = 0; $ii <= $#all_out; $ii++) {
    print $all_out[$ii];
 
    if ($all_out[$ii] =~ m/^\s*((BLOCK|ARRAY|LANGUAGE)
-            (_END)?|LOCAL_CONST|CONST)\b/x) {
+            (_END)?|BLOCK_CONST|CONST)\b/x) {
       while ($all_out[$ii] =~ m/\\$/) {
          $ii++;
          print "\n$all_out[$ii]";

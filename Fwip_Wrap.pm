@@ -1,5 +1,6 @@
 package Fwip_Wrap;
 #    Copyright (C) 2019-2020 by Kevin D. Woerner
+# 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-05-20 kdw  dont print, just return value
 # 2020-04-10 kdw  no backslashes in output
 # 2020-03-12 kdw  var renam
@@ -28,11 +29,12 @@ sub fwip_wrap($;$$ )
    my $lead = "$1";
    if (0 < $mlm) {
       my $orig = $ln;
-      while ($ln =~ s/^(\s*)((LOCAL_)?FUNC\b.*)(,.*)
-               /$1$2\n$1${bq}${bq}$4/x) {
+      # format function arguments correctly
+      while ($ln =~ s/^(\s*)\b((BLOCK_FUNC|FUNC)\b[^\#\n]*)(,.*)
+               /$1$2\n$1${bq}${bq}$4/x and $cxc < CNN / 2) {
          $cxc++;
       }
-      while ($ln =~ m/^.{$mlm}./) {
+      while ($ln =~ m/^.{$mlm}./m) {
          if ($verbose and $cxc == 0) {
             print STDERR "\nBEFORE:$cxc:$ln";
          }

@@ -1,6 +1,8 @@
 #! /usr/bin/perl -W
 #    Copyright (C) 2015-2020 by Kevin D. Woerner
 # FWIP (Functions Written In Pseudocode) Processor
+# 2020-07-29 kdw  block-def work
+# 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-07-20 kdw  arraylast work
 # 2020-07-14 kdw  rmed unused code
 # 2020-07-09 kdw  mode-extended rmd
@@ -481,7 +483,7 @@ sub funcyaddcnx($$ )
    $funcy_bcrx .= "|$name";
 
    my $cxnamel = "cx" . lc($name);
-   if ($_[1] !~ m/LOCAL_CONST/) {
+   if ($_[1] !~ m/BLOCK_CONST/) {
       if (Fwip_Translate::fwipt_lang_is(LANG_BC)) {
          funcyadd($cxnamel, -1);
       } else {
@@ -659,7 +661,7 @@ while (my $ln = <>) {
    } elsif ($ln =~ s/LANGUAGE_END\b//) {
       $good_current_language = 1;
    } elsif ($good_current_language) {
-      if ($ln =~ s/^\b(MASTER)\b//) {
+      if ($ln =~ s/^\b(IMPORT_MASTER)\b//) {
          push(@input_lines, Fwip_Comment::fwipc_comm("$1", "A"));
          $master_flag = 1;
       } elsif ($ln =~ m/^($cmfwip0 \d{4}(-\d\d){2} kdw  )(.*)/) {
@@ -818,7 +820,7 @@ foreach (@input_lines) {
             foreach my $subb (split(/\n/, $master_functions)) {
                if ($subb =~ m/^$master_sub\s+([a-z_0-9]+)\(/) {
                   push(@ms_fun, Fwip_Comment::fwipc_comm(
-                     "MASTER-Function", "$1"));
+                     "IMPORT_MASTER-Function", "$1"));
                }
                push(@ms_fun, $subb);
             }
@@ -860,7 +862,7 @@ foreach (@input_lines) {
 
    $_ = Fwip_Translate::fwipt_too($_);
 
-   # LOCAL_CONST
+   # BLOCK_CONST
    my $gj;
    do {
       $gj = 0;
@@ -915,12 +917,12 @@ foreach (@input_lines) {
 
       s/(?<!")($rxp_an)/\$$1/g; # sigils
       s/(?<!")($rxp_vn)/\$$1/g; # sigils
-      s/((?:LOCAL_)?CONST)\s+\$($rxp_vn)/$1 $2 /g;
+      s/((?:BLOCK_DEF\s+)?CONST)\s+\$($rxp_vn)/$1 $2 /g;
       s/[\$\@]+([\$\@])(\w)/$1$2/g;  # rm duplicate sigils
       s/\$+($rxp_fn)/$1/g; # rm func sigils
 
       # PERL ---- ----- ----- ----- ----- ----- ----- ----- -----
-      if (s/^\s*((?:LOCAL_)?CONST)\s+(\w+)\b\s*(\S.*?);//s) {
+      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
          my ($what, $name, $val) = ($1, $2, $3);
          $name =~ s/^\$//;
          my $cxnamel = funcyaddcnx($name, $what);
@@ -1034,7 +1036,7 @@ foreach (@input_lines) {
       s/^\bIMPORT\s*\"(.*?)\"\s*;/import $1\n/;
 #      s/^\bIMPORT\s*\"(.*?)\"\s*;/from $1 import *\n/;
       # PYTHON -- ----- ----- ----- ----- ----- ----- ----- -----
-      if (s/^\s*((?:LOCAL_)?CONST)\s+(\w+)\b\s*(\S.*?);//s) {
+      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
          my ($what, $name, $val) = ($1, $2, $3);
          my $cxnamel = funcyaddcnx($name, $what);
          push(@cx_funs
@@ -1122,11 +1124,11 @@ foreach (@input_lines) {
             . " $func($args)$qq$rest";
       }
       # VB6 ----- ----- ----- ----- ----- ----- ----- ----- -----
-      if (s/^\s*((?:LOCAL_)?CONST)\s+(\w+)\b\s*(\S.*?);//s) {
+      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
          my ($what, $name, $val) = ($1, $2, $3);
          my $ty = ("Double");
 #         $_ = "";
-         my $pp = ($what =~ m/LOCAL_CO/ ? "Private" : "Public");
+         my $pp = ($what =~ m/BLOCK_DEF/ ? "Private" : "Public");
          my $cxnamel = funcyaddcnx($name, $what);
          $val =~ s/SQRT\s*\((.+)\)/($1) ^ 0.5/;
          # VB6 doesnt do self-ref modules
@@ -1158,6 +1160,7 @@ foreach (@input_lines) {
          my $var = $3;
          s/\s*(=)(.*)//;
          s/([A-Z]+) Dim/$1/;
+         s/\[0\]/[]/;
       }
       s/(\(|, )Dim /${1}ByVal /g; # rm dim from funcs
 
@@ -1249,11 +1252,11 @@ foreach (@input_lines) {
             . " $func($args)$qq$rest";
       }
       # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- -----
-      if (s/^\s*((?:LOCAL_)?CONST)\s+(\w+)\b\s*(\S.*?);//s) {
+      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
          my ($what, $name, $val) = ($1, $2, $3);
          my $ty = "Double";
          $_ = "";
-         my $pp = ($what =~ m/LOCAL_CO/ ? "Private" : "Public")
+         my $pp = ($what =~ m/BLOCK_DEF/ ? "Private" : "Public")
             . " Shared";
          my $cxnamel = funcyaddcnx($name, $what);
          $val =~ s/SQRT\s*\((.+)\)/($1) ^ 0.5/;
@@ -1270,8 +1273,9 @@ foreach (@input_lines) {
          my $var = $3;
          s/\s*=(.*)//;
          s/($rxp_an) Dim/$1/;
+         s/\[0\]/[]/;
       }
-      my $rxp_vdl = "\\bLOCAL_(DBL|STR|INT|BOL)";
+      my $rxp_vdl = "\\bBLOCK_(DBL|STR|INT|BOL)";
       if (s/(?<!\bAs)(\s*)$rxp_vdl\s+($rxp_an\b)\[(.*)\]
             / "${1}Private $3\[$4\] As $2" /xeg
          or
@@ -1375,14 +1379,14 @@ foreach (@input_lines) {
       # C - ----- ----- ----- ----- ----- ----- ----- ----- -----
       # H - ----- ----- ----- ----- ----- ----- ----- ----- -----
       # RPN ----- ----- ----- ----- ----- ----- ----- ----- -----
-      if (s/^\s*((?:LOCAL_)?CONST)\s+(\w+)\b\s*(\S.*?);//s) {
+      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
          my ($what, $name, $val) = ($1, $2, $3);
-         my $ty = ($what eq "LOCAL_CONST" ? "long" : "double");
+         my $ty = ($what eq "BLOCK_DEF" ? "long" : "double");
          $_ = "";
          my $cxnamel = funcyaddcnx($name, $what);
          $val =~ s/\b(SQRT|EXP)\b/\L$1/g;
          $val =~ s/\bLN\b\s*\(/log(/g;
-         if ($what !~ m/LOCAL_CO/) {
+         if ($what !~ m/BLOCK_DEF/) {
             push(@cx_funs
                , lf_cmadd(sprintf("$ty %s { return ($name); }"
                   , "$cxnamel(void)"), 1));
@@ -1461,7 +1465,7 @@ foreach (@input_lines) {
 
       s/^\b(IMPORT\s*\"(.*?)\"\s*;)/$cmout0$1\n/;
       # BC  ----- ----- ----- ----- ----- ----- ----- ----- -----
-      if (s/^\s*((?:LOCAL_)?CONST)\s+(\w+)\b\s*(\S.*?);//s) {
+      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
          my ($what, $name, $val) = ($1, $2, $3);
          my $cxnamel = funcyaddcnx($name, $what);
          $val =~ s/EXP\s*\(/e(/g;
@@ -1484,16 +1488,16 @@ foreach (@input_lines) {
       s/PRINTVAL\s*\((.*?)\)\s*;/print $1;/;
       my $dlag = 0;
 
-      if (s/LOCAL_(?:INT|DBL|STR|BOL)\s+
+      if (s/BLOCK_(?:INT|DBL|STR|BOL)\s+
                      ($rxp_an)\[([^\]]+)\]\[([^\]]+)\]
                /auto $1\[($2 + 1) * $3\]/xg) {
          $bc_2darrdim{$1} = "$3";
          $dlag = 1;
-      } elsif (s/LOCAL_(?:INT|DBL|STR|BOL)
+      } elsif (s/BLOCK_(?:INT|DBL|STR|BOL)
                   \s+($rxp_an)\[([^\]]*)\]
                /auto $1\[$2\]/xg) {
          $dlag = 1;
-      } elsif (s/LOCAL_(?:INT|DBL|STR|BOL)
+      } elsif (s/BLOCK_(?:INT|DBL|STR|BOL)
                   \s+(\w+(\s*=.*)?)(?=;)
                /auto $1/xg) {
          $dlag = 1;

@@ -1,5 +1,6 @@
 package Fwip_Parse;
 #    Copyright (C) 2017-2020 by Kevin D. Woerner
+# 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-05-29 kdw  major simplification
 # 2020-05-26 kdw  simplified rx
 # 2020-05-20 kdw  dont remove module names from consts
@@ -134,7 +135,7 @@ sub rx_variabledecl()
 }
 sub rx_function_decl()
 {
-   "\\b(?:LOCAL_FUNC|FUNC)"
+   "\\b(?:BLOCK_FUNC|FUNC)"
       . "\\s+(" . rx_variabledecl() . ")"
       . "\\s+(" . rx_functionname() .")"
       . "\\s*\\((.*)\\)\\s*:(.*)";

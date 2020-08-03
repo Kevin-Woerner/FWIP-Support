@@ -1,5 +1,6 @@
 #! /usr/bin/perl -W
 #    Copyright (C) 2016-2020 by Kevin D. Woerner
+# 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-05-13 kdw  lang comment trivially changed
 # 2020-05-12 kdw  language syntax
 # 2020-05-11 kdw  REPL[A]CE replaced with LO[C]AL_CO[N]ST
@@ -167,7 +168,7 @@ while (my $ln = <>) {
       }
    }
 
-   if (s/\b(LOCAL_CONST) +(\w+)//) {
+   if (s/\b(BLOCK_CONST) +(\w+)//) {
       my @aa = ($1, $2);
       addd($aa[0], $current_filename);
       $fwip{$aa[0]}++;
@@ -188,7 +189,7 @@ while (my $ln = <>) {
       $consts{$aa[1]}++;
    }
 
-   while (s/(LOCAL_CONST)\s+(\w+)//) {
+   while (s/(BLOCK_CONST)\s+(\w+)//) {
       my @aa = ($1, $2);
       addd($aa[0], $current_filename);
       $indeck{$aa[0]}++;

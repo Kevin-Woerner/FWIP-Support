@@ -1,4 +1,8 @@
 //   Copyright (C) 2018-2020 by Kevin D. Woerner
+// 2020-07-30 kdw  clean up
+// 2020-07-29 kdw  block-def work
+// 2020-07-25 kdw  s/BITWISE/BIT/
+// 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 // 2020-07-09 kdw  mode-extended rmd
 // 2020-07-08 kdw  more verbose on error
 // 2020-06-22 kdw  local-use decl before var decls
@@ -81,12 +85,14 @@
 %token AWAIT_KW
 %token BITSHIFTL_FUN_KW
 %token BITSHIFTR_FUN_KW
-%token BITWISEAND_FUN_KW
-%token BITWISENOT_FUN_KW
-%token BITWISEOR_FUN_KW
-%token BITWISEXOR_FUN_KW
+%token BITAND_FUN_KW
+%token BITNOT_FUN_KW
+%token BITOR_FUN_KW
+%token BITXOR_FUN_KW
+%token BLOCK_DEF_KW
 %token BLOCK_END_KW
 %token BLOCK_KW
+%token BLOCK_USE_KW
 %token BOL_KW
 %token BY_KW
 %token CALL_KW
@@ -112,6 +118,7 @@
 %token IF_END_KW
 %token IF_KW
 %token IMPORT_KW
+%token IMPORT_MASTER_KW
 %token INT_KW
 %token LANGUAGE_END_KW
 %token LANGUAGE_KW
@@ -126,14 +133,6 @@
 %token LANG_VB6_KW
 %token LANG_VBDOTNET_KW
 %token LN_FUN_KW
-%token LOCAL_BOL_KW
-%token LOCAL_CONST_KW
-%token LOCAL_DBL_KW
-%token LOCAL_FUNC_KW
-%token LOCAL_INT_KW
-%token LOCAL_STR_KW
-%token LOCAL_USE_KW
-%token MASTER_KW
 %token MODE_INTEGER_END_KW
 %token MODE_INTEGER_KW
 %token MOD_FUN_KW
@@ -211,15 +210,102 @@
 // Grammar rules and actions follow.
 
 %%
+
 fwip_program :
    comment_ge0
    fwip_import
-   chunk_ge1 ;
+   fwipcode_ge1 ;
 
-chunk_eq1 :
-   comment_ge1
-   | CONST_KW CONST_NAME_DEF num_expr_eq1 ";"
-   | FUNC_KW funcret_set FUNC_NAME_DEF "("
+fwipcode_eq1 :
+   COMMENT
+   | const_def_eq1
+   | func_def_eq1
+   | BLOCK_KW ":"
+         block_defs_ge1
+         fwipcode_ge0
+      BLOCK_END_KW
+   | language_start_eq1 language_ge1 ":"
+         fwipcode_ge1
+      LANGUAGE_END_KW ;
+
+fwipcode_ge1 :
+   fwipcode_eq1
+   | fwipcode_eq1
+      fwipcode_ge1 ;
+
+fwipcode_ge0 :
+   %empty
+   | fwipcode_ge1 ;
+
+comment_ge0 :
+   %empty
+   | comment_ge0
+      COMMENT ;
+
+language_eq1 :
+   LANG_PERL_KW  | LANG_PYTHON_KW   | LANG_BC_KW
+   | LANG_C_KW   | LANG_VARYLOG_KW  | LANG_UNITS_KW
+   | LANG_VB6_KW | LANG_VBDOTNET_KW | LANG_FWIPP_KW ;
+
+language_ge1:
+   language_eq1
+   | language_eq1 language_ge1 ;
+
+language_start_eq1 :
+   LANGUAGE_KW | LANGUAGE_NOT_KW ;
+
+vartype_kws :
+   STR_KW
+   | INT_KW
+   | DBL_KW
+   | BOL_KW ;
+
+func_retval_kws :
+   INT_KW
+   | DBL_KW ;
+
+import_ge0 :
+   comment_ge0
+   | import_ge0
+      IMPORT_KW STRING_EXPLICIT ";" ;
+
+fwip_import :
+   import_ge0
+   | IMPORT_MASTER_KW ";" ;
+
+func_call_DretD_name :
+   FLOOR_FUN_KW
+   | CEIL_FUN_KW
+   | SQRT_FUN_KW
+   | ABS_FUN_KW
+   | SIN_FUN_KW
+   | COS_FUN_KW
+   | TAN_FUN_KW
+   | EXP_FUN_KW
+   | LN_FUN_KW ;
+
+func_call_DDretD_name :
+   ATAN2_FUN_KW
+   | POW_FUN_KW ;
+
+func_call_DretL_name :
+   FLOORL_FUN_KW
+   | CEILL_FUN_KW ;
+
+func_call_LretL_name :
+   ABSL_FUN_KW
+   | BITNOT_FUN_KW ;
+
+func_call_LLretL_name :
+   MOD_FUN_KW
+   | BITAND_FUN_KW
+   | BITXOR_FUN_KW
+   | BITOR_FUN_KW
+   | BITSHIFTL_FUN_KW
+   | BITSHIFTR_FUN_KW ;
+
+func_def_eq1 :
+   FUNC_KW func_retval_kws FUNC_NAME_DEF "("
          funcarg_decl_ge0 ")" ":"
          variable_decls
          fwip_statement_ge0
@@ -232,71 +318,7 @@ chunk_eq1 :
          fwip_statement_ge0
          RETURN_KW bol_expr_com ";"
          comment_ge0
-      FUNC_END_KW
-   | BLOCK_KW ":"
-      comment_ge0
-      local_const_ge0
-      local_decl_ge0
-      local_func_ge0
-      chunk_ge1
-      BLOCK_END_KW
-   | language_start_eq1 language_ge1 ":"
-      chunk_ge1
-      LANGUAGE_END_KW ;
-
-chunk_ge1 :
-   chunk_eq1
-   | chunk_eq1
-      chunk_ge1 ;
-
-comment_ge1 :
-   COMMENT
-   | COMMENT comment_ge1 ;
-
-comment_ge0 :
-   %empty
-   | comment_ge1 ;
-
-import_ge0 :
-   %empty
-   | IMPORT_KW STRING_EXPLICIT ";"
-      comment_ge0
-      import_ge0 ;
-
-fwip_import :
-   MASTER_KW ";"
-   | import_ge0 ;
-
-func_DretD_name :
-   FLOOR_FUN_KW
-   | CEIL_FUN_KW
-   | SQRT_FUN_KW
-   | ABS_FUN_KW
-   | SIN_FUN_KW
-   | COS_FUN_KW
-   | TAN_FUN_KW
-   | EXP_FUN_KW
-   | LN_FUN_KW ;
-
-func_DDretD_name :
-   ATAN2_FUN_KW
-   | POW_FUN_KW ;
-
-func_DretL_name :
-   FLOORL_FUN_KW
-   | CEILL_FUN_KW ;
-
-func_LretL_name :
-   ABSL_FUN_KW
-   | BITWISENOT_FUN_KW ;
-
-func_LLretL_name :
-   MOD_FUN_KW
-   | BITWISEAND_FUN_KW
-   | BITWISEXOR_FUN_KW
-   | BITWISEOR_FUN_KW
-   | BITSHIFTL_FUN_KW
-   | BITSHIFTR_FUN_KW ;
+      FUNC_END_KW ;
 
 num_expr_eq1 :
    num_expr_eq1 "+" num_expr_eq1
@@ -305,11 +327,11 @@ num_expr_eq1 :
    | num_expr_eq1 "/" num_expr_eq1
    | num_expr_eq1 "%" num_expr_eq1
    | ARRAYLAST_FUN_KW "(" ARR_NAME "[" "]" ")"
-   | func_DretD_name "(" num_expr_eq1 ")"
-   | func_DretL_name "(" num_expr_eq1 ")"
-   | func_LretL_name "(" num_expr_eq1 ")"
-   | func_DDretD_name "(" num_expr_eq1 "," num_expr_eq1 ")"
-   | func_LLretL_name "(" num_expr_eq1 "," num_expr_eq1 ")"
+   | func_call_DretD_name "(" num_expr_eq1 ")"
+   | func_call_DretL_name "(" num_expr_eq1 ")"
+   | func_call_LretL_name "(" num_expr_eq1 ")"
+   | func_call_DDretD_name "(" num_expr_eq1 "," num_expr_eq1 ")"
+   | func_call_LLretL_name "(" num_expr_eq1 "," num_expr_eq1 ")"
    | FUNC_NAME "(" funcarg_ge0 ")"
    | assignable_value_eq1
    | "(" num_expr_eq1 ")"
@@ -324,12 +346,7 @@ assignable_value_eq1 :
    | ARR_NAME "[" num_expr_eq1 "]"
    | ARR_NAME "[" num_expr_eq1 "]" "[" num_expr_eq1 "]" ;
 
-num_cmp_eq1 : "=="
-   | "<>"
-   | ">="
-   | ">"
-   | "<="
-   | "<" ;
+num_cmp_eq1 : "==" | "<>" | ">=" | ">" | "<=" | "<" ;
 
 bol_expr_com :
    FUNC_NAME "(" funcarg_ge0 ")"
@@ -346,17 +363,14 @@ string_set:
    | STRING_TAB_KW
    | STRING_NL_KW ;
 
-assignment_op : "*="
-   | "+="
-   | "-="
-   | "/=" ;
+assignment_op : "*=" | "+=" | "-=" | "/=" ;
 
 fwip_statement_eq1 :
    assignable_value_eq1 assignment_op num_expr_eq1 ";"
    | assignable_value_eq1 "=" num_expr_eq1 ";"
    | assignable_value_eq1 "=" TRUE_KW ";"
    | assignable_value_eq1 "=" FALSE_KW ";"
-   | comment_ge1
+   | COMMENT
    | IF_KW bol_expr_com ":"
          fwip_statement_ge1
       elseif_ge0
@@ -383,7 +397,7 @@ fwip_statement_eq1 :
    | PRINTVAL_FUN_KW "(" num_expr_eq1 ")" ";"
    | CALL_KW FUNC_NAME "(" funcarg_ge0 ")" ";"
    | language_start_eq1 language_ge1 ":"
-      fwip_statement_ge1
+         fwip_statement_ge1
       LANGUAGE_END_KW
    | MODE_INTEGER_KW ":"
          fwip_statement_ge1
@@ -399,23 +413,11 @@ fwip_statement_ge0 :
    %empty
    | fwip_statement_ge1 ;
 
-language_eq1 :
-   LANG_PERL_KW  | LANG_PYTHON_KW   | LANG_BC_KW
-   | LANG_C_KW   | LANG_VARYLOG_KW  | LANG_UNITS_KW
-   | LANG_VB6_KW | LANG_VBDOTNET_KW | LANG_FWIPP_KW ;
-
-language_ge1:
-   language_eq1
-   | language_eq1 language_ge1 ;
-
-language_start_eq1 :
-   LANGUAGE_KW | LANGUAGE_NOT_KW ;
-
 elseif_ge0 :
    %empty
    | ELSIF_KW bol_expr_com ":"
-      fwip_statement_ge1
-   elseif_ge0 ;
+         fwip_statement_ge1
+      elseif_ge0 ;
 
 else_le1 :
    %empty
@@ -437,51 +439,25 @@ count_num_le1 :
    %empty
    | COUNT_KW VAR_NAME for_ftb_le1 ;
 
-vartype_set :
-   STR_KW
-   | INT_KW
-   | DBL_KW
-   | BOL_KW ;
-
-funcret_set :
-   INT_KW
-   | DBL_KW ;
-
-dim :
-   CONST_NAME
-   | INTEGER_EXPLICIT ;
-
-local_use_decl_eq1 :
-   LOCAL_USE_KW VAR_NAME ";"
-   | LOCAL_USE_KW ARR_NAME "[" "]" ";"
-   | LOCAL_USE_KW ARR_NAME "[" "]" "[" "]" ";" ;
-
-local_use_decl_ge0 :
-   %empty
-   | local_use_decl_ge0
-      local_use_decl_eq1 ;
-
 variable_decl_eq1 :
-   vartype_set VAR_NAME_DEF ";"
-   | vartype_set ARR_NAME_DEF "[" num_expr_eq1 "]" ";"
-   | vartype_set ARR_NAME_DEF "[" "]" ";" ;
+   vartype_kws VAR_NAME_DEF ";"
+   | vartype_kws ARR_NAME_DEF "[" num_expr_eq1 "]" ";"
+   | vartype_kws ARR_NAME_DEF "[" "]" ";" ;
 
 variable_decl_ge0 :
-   %empty
+   comment_ge0
    | variable_decl_ge0
       variable_decl_eq1 ;
 
 variable_decls :
-   comment_ge0
-      local_use_decl_ge0
-      comment_ge0
-      variable_decl_ge0 ;
+   block_use_ge0
+   variable_decl_ge0 ;
 
 funcarg_decl_eq1 :
-   vartype_set VAR_NAME_DEF
-   | READONLY_KW vartype_set ARR_NAME_DEF "[" "]"
-   | WRITEONLY_KW vartype_set ARR_NAME_DEF "[" "]"
-   | WRITEABLE_KW vartype_set ARR_NAME_DEF "[" "]" ;
+   vartype_kws VAR_NAME_DEF
+   | READONLY_KW vartype_kws ARR_NAME_DEF "[" "]"
+   | WRITEONLY_KW vartype_kws ARR_NAME_DEF "[" "]"
+   | WRITEABLE_KW vartype_kws ARR_NAME_DEF "[" "]" ;
 
 funcarg_decl_ge1 :
    funcarg_decl_eq1
@@ -505,48 +481,72 @@ funcarg_ge0 :
    %empty
    | funcarg_ge1 ;
 
-local_const_ge0 :
+const_def_eq1 :
+   CONST_KW CONST_NAME_DEF num_expr_eq1 ";" ;
+
+block_use_eq1 :
+   BLOCK_USE_KW VAR_NAME ";"
+   | BLOCK_USE_KW ARR_NAME "[" "]" ";"
+   | BLOCK_USE_KW ARR_NAME "[" "]" "[" "]" ";" ;
+
+block_use_ge0 :
    %empty
-   | LOCAL_CONST_KW CONST_NAME_DEF num_expr_eq1 ";"
+   | block_use_ge0
       comment_ge0
-      local_const_ge0 ;
+      block_use_eq1 ;
 
-local_vartype_set :
-   LOCAL_STR_KW
-   | LOCAL_INT_KW
-   | LOCAL_DBL_KW
-   | LOCAL_BOL_KW ;
+dim :
+   CONST_NAME
+   | INTEGER_EXPLICIT ;
 
-local_decl_eq1 :
-   local_vartype_set VAR_NAME ";"
-   | local_vartype_set VAR_NAME "=" num_expr_eq1 ";"
-   | local_vartype_set ARR_NAME "[" dim "]" ";"
-   | local_vartype_set ARR_NAME "[" dim "]" "[" dim "]" ";" ;
+var_def_eq1 :
+   vartype_kws VAR_NAME_DEF ";"
+   | vartype_kws VAR_NAME_DEF "=" num_expr_eq1 ";"
+   | vartype_kws ARR_NAME_DEF "[" dim "]" ";"
+   | vartype_kws ARR_NAME_DEF "[" dim "]" "[" dim "]" ";" ;
 
-local_decl_ge0 :
-   %empty
-   | local_decl_eq1
+block_const_def_ge1 :
+   block_const_def_ge1
       comment_ge0
-      local_decl_ge0 ;
+      BLOCK_DEF_KW const_def_eq1
+   | comment_ge0
+      BLOCK_DEF_KW const_def_eq1 ;
 
-local_func_ge0 :
-   %empty
-   | LOCAL_FUNC_KW funcret_set FUNC_NAME_DEF "("
-         funcarg_decl_ge0 ")" ":"
-      variable_decls
-      fwip_statement_ge0
-      RETURN_KW num_expr_eq1 ";"
+block_var_def_ge1 :
+   block_var_def_ge1
       comment_ge0
-   FUNC_END_KW
-   local_func_ge0
-   | LOCAL_FUNC_KW BOL_KW FUNC_NAME_DEF "("
-         funcarg_decl_ge0 ")" ":"
-      variable_decls
-      fwip_statement_ge0
-      RETURN_KW bol_expr_com ";"
+      BLOCK_DEF_KW var_def_eq1
+   | comment_ge0
+      BLOCK_DEF_KW var_def_eq1 ;
+
+block_func_def_ge1 :
+   block_func_def_ge1
       comment_ge0
-   FUNC_END_KW
-   local_func_ge0 ;
+      BLOCK_DEF_KW func_def_eq1
+   | comment_ge0
+      BLOCK_DEF_KW func_def_eq1 ;
+
+block_defs_ge1 :
+   block_const_def_ge1
+      block_var_def_ge1
+      block_func_def_ge1
+      func_def_eq1
+   | block_const_def_ge1
+      block_func_def_ge1
+      func_def_eq1
+   | block_const_def_ge1
+      block_var_def_ge1
+      func_def_eq1
+   | block_var_def_ge1
+      block_func_def_ge1
+      func_def_eq1
+   | block_const_def_ge1
+      comment_ge0
+      func_def_eq1
+   | block_var_def_ge1
+      func_def_eq1
+   | block_func_def_ge1
+      func_def_eq1 ;
 
 array_val_eq1 :
    comment_ge0
@@ -578,7 +578,7 @@ static int str_eq(const char *sa_pc
    size_t b_len;
 
    b_len = strlen(sb_pc);
-   return (strncmp(sa_pc, sb_pc, b_len) == 0
+   return (strncmp(sa_pc, sb_pc, b_len + 1) == 0
          && !isword(sa_pc[b_len]));
 }
 
@@ -650,6 +650,8 @@ static int str_eq(const char *sa_pc
       } \
    }
 
+static int line_number = 1;
+static const char *program_name = NULL;
 int
 yylex(struct YYSTYPE *lval_p)
 {
@@ -657,7 +659,6 @@ yylex(struct YYSTYPE *lval_p)
    char *v_p;
    int retvalu;
    int saw;
-   static int line_number = 1;
    static int prev_typdef = -1;
 
    // Skip white space.
@@ -722,104 +723,98 @@ yylex(struct YYSTYPE *lval_p)
       retvalu = (saw == 0 ? INTEGER_EXPLICIT : DOUBLE_EXPLICIT);
    } else if (isupper(cc)) {
       READ_EXCLUDE(cc, v_p, !(isword(cc) || cc == '.'));
-      IF_KWRD(MODE_INTEGER_END)
+      IF_KWRD(AND)
+      else IF_KWRD(ARRAY)
+      else IF_KWRD(ARRAY_END)
+      else IF_KWRD(AWAIT)
+      else IF_KWRD(AWAIT_END)
+      else IF_KWRD(AWAIT_EXIT)
+      else IF_KWRD(BLOCK)
+      else IF_KWRD(BLOCK_DEF)
+      else IF_KWRD(BLOCK_END)
+      else IF_KWRD(BLOCK_USE)
+      else IF_KWRD(BOL)
+      else IF_KWRD(BY)
+      else IF_KWRD(CALL)
+      else IF_KWRD(CONST)
+      else IF_KWRD(COUNT)
+      else IF_KWRD(DBL)
+      else IF_KWRD(DIE)
+      else IF_KWRD(ELSE)
+      else IF_KWRD(ELSIF)
+      else IF_KWRD(FALSE)
+      else IF_KWRD(FOR)
+      else IF_KWRD(FOR_END)
+      else IF_KWRD(FOR_EXIT)
+      else IF_KWRD(FROM)
+      else IF_KWRD(FUNC)
+      else IF_KWRD(FUNC_END)
+      else IF_KWRD(IF)
+      else IF_KWRD(IF_END)
+      else IF_KWRD(IMPORT)
+      else IF_KWRD(IMPORT_MASTER)
+      else IF_KWRD(INT)
+      else IF_KWRD(LANGUAGE)
+      else IF_KWRD(LANGUAGE_END)
+      else IF_KWRD(LANGUAGE_NOT)
+      else IF_KWRD(LANG_BC)
+      else IF_KWRD(LANG_C)
+      else IF_KWRD(LANG_PERL)
+      else IF_KWRD(LANG_PYTHON)
+      else IF_KWRD(LANG_UNITS)
+      else IF_KWRD(LANG_VARYLOG)
+      else IF_KWRD(LANG_VB6)
       else IF_KWRD(LANG_VBDOTNET)
       else IF_KWRD(MODE_INTEGER)
-      else IF_KWRD(LANGUAGE_NOT)
-      else IF_KWRD(LANGUAGE_END)
-      else IF_KWRD(LANG_VARYLOG)
-      else IF_KWRD(LOCAL_CONST)
-      else IF_KWRD(LANG_PYTHON)
-      else IF_KWRD(WHILE_EXIT)
+      else IF_KWRD(MODE_INTEGER_END)
+      else IF_KWRD(NOT)
+      else IF_KWRD(NUL)
+      else IF_KWRD(OR)
+      else IF_KWRD(READONLY)
+      else IF_KWRD(REDIM)
+      else IF_KWRD(RETURN)
+      else IF_KWRD(STR)
+      else IF_KWRD(STRING_NL)
       else IF_KWRD(STRING_TAB)
-      else IF_KWRD(AWAIT_EXIT)
-      else IF_KWRD(LANG_UNITS)
-      else IF_KWRD(LOCAL_FUNC)
-      else IF_KWRD(LOCAL_DBL)
-      else IF_KWRD(LOCAL_INT)
-      else IF_KWRD(LOCAL_STR)
-      else IF_KWRD(LOCAL_BOL)
+      else IF_KWRD(TO)
+      else IF_KWRD(TRUE)
+      else IF_KWRD(WHILE)
+      else IF_KWRD(WHILE_END)
+      else IF_KWRD(WHILE_EXIT)
       else IF_KWRD(WRITEABLE)
       else IF_KWRD(WRITEONLY)
-      else IF_KWRD(LOCAL_USE)
-      else IF_KWRD(ARRAY_END)
-      else IF_KWRD(WHILE_END)
-      else IF_KWRD(AWAIT_END)
-      else IF_KWRD(STRING_NL)
-      else IF_KWRD(BLOCK_END)
-      else IF_KWRD(LANG_PERL)
-      else IF_KWRD(LANGUAGE)
-      else IF_KWRD(READONLY)
-      else IF_KWRD(FUNC_END)
-      else IF_KWRD(FOR_EXIT)
-      else IF_KWRD(LANG_VB6)
-      else IF_KWRD(FOR_END)
-      else IF_KWRD(LANG_BC)
-      else IF_KWRD(RETURN)
-      else IF_KWRD(MASTER)
-      else IF_KWRD(IMPORT)
-      else IF_KWRD(IF_END)
-      else IF_KWRD(LANG_C)
-      else IF_KWRD(CONST)
-      else IF_KWRD(WHILE)
-      else IF_KWRD(REDIM)
-      else IF_KWRD(ELSIF)
-      else IF_KWRD(COUNT)
-      else IF_KWRD(BLOCK)
-      else IF_KWRD(AWAIT)
-      else IF_KWRD(ARRAY)
-      else IF_KWRD(FALSE)
-      else IF_KWRD(FUNC)
-      else IF_KWRD(FROM)
-      else IF_KWRD(ELSE)
-      else IF_KWRD(CALL)
-      else IF_KWRD(TRUE)
-      else IF_KWRD(STR)
-      else IF_KWRD(BOL)
-      else IF_KWRD(NUL)
-      else IF_KWRD(INT)
-      else IF_KWRD(FOR)
-      else IF_KWRD(DIE)
-      else IF_KWRD(DBL)
-      else IF_KWRD(NOT)
-      else IF_KWRD(AND)
       else IF_KWRD(XOR)
-      else IF_KWRD(OR)
-      else IF_KWRD(TO)
-      else IF_KWRD(IF)
-      else IF_KWRD(BY)
       else {
          if (isspace(cc)) {
             SKIP_WS(cc);
          }
-         if (prev_typdef == CONST_KW
-                  || prev_typdef == LOCAL_CONST_KW) {
+         if (prev_typdef == CONST_KW) {
             retvalu = CONST_NAME_DEF;
          } else if (cc == '(') {
-            IF_FUNC(BITWISEAND)
-            else IF_FUNC(BITWISEXOR)
-            else IF_FUNC(BITWISENOT)
-            else IF_FUNC(BITWISEOR)
+            IF_FUNC(ABS)
+            else IF_FUNC(ABSL)
+            else IF_FUNC(ARRAYLAST)
+            else IF_FUNC(ATAN2)
             else IF_FUNC(BITSHIFTL)
             else IF_FUNC(BITSHIFTR)
-            else IF_FUNC(ARRAYLAST)
-            else IF_FUNC(PRINTVAL)
-            else IF_FUNC(PRINTSTR)
-            else IF_FUNC(FLOORL)
-            else IF_FUNC(FLOOR)
-            else IF_FUNC(ATAN2)
-            else IF_FUNC(CEILL)
+            else IF_FUNC(BITAND)
+            else IF_FUNC(BITNOT)
+            else IF_FUNC(BITOR)
+            else IF_FUNC(BITXOR)
             else IF_FUNC(CEIL)
-            else IF_FUNC(ABSL)
-            else IF_FUNC(SQRT)
-            else IF_FUNC(POW)
-            else IF_FUNC(SIN)
+            else IF_FUNC(CEILL)
             else IF_FUNC(COS)
-            else IF_FUNC(TAN)
-            else IF_FUNC(MOD)
-            else IF_FUNC(ABS)
             else IF_FUNC(EXP)
+            else IF_FUNC(FLOOR)
+            else IF_FUNC(FLOORL)
             else IF_FUNC(LN)
+            else IF_FUNC(MOD)
+            else IF_FUNC(POW)
+            else IF_FUNC(PRINTSTR)
+            else IF_FUNC(PRINTVAL)
+            else IF_FUNC(SIN)
+            else IF_FUNC(SQRT)
+            else IF_FUNC(TAN)
             else if (prev_typdef == DBL_KW
                         || prev_typdef == INT_KW
                         || prev_typdef == BOL_KW) {
@@ -850,8 +845,7 @@ yylex(struct YYSTYPE *lval_p)
                retvalu = FUNC_NAME;
             }
          } else {
-            if (prev_typdef == CONST_KW
-                     || prev_typdef == LOCAL_CONST_KW) {
+            if (prev_typdef == CONST_KW) {
                retvalu = CONST_NAME_DEF;
             } else {
                retvalu = CONST_NAME;
@@ -878,8 +872,7 @@ yylex(struct YYSTYPE *lval_p)
                retvalu = FUNC_NAME;
             }
          } else {
-            if (prev_typdef == CONST_KW
-                     || prev_typdef == LOCAL_CONST_KW) {
+            if (prev_typdef == CONST_KW) {
                retvalu = CONST_NAME_DEF;
             } else if (prev_typdef == DBL_KW
                      || prev_typdef == INT_KW
@@ -935,8 +928,10 @@ yyerror(char const *ss)
    int ii;
    int cc;
 
-   fprintf(stderr, "FWIP-PARSING-ERROR:%s\n*******\n", ss);
+   fprintf(stderr, "%-6d %-4s *******%s-PARSING-ERROR:%s\n"
+         , line_number, "-", program_name, ss);
    ii = 0;
+   fprintf(stderr, "%-6d %-4s", line_number, "-");
    while (ii < 8) {
       cc = getc(stdin);
       if (cc == EOF) {
@@ -945,10 +940,12 @@ yyerror(char const *ss)
       fprintf(stderr, "%c", cc);
       if (cc == '\n') {
          ii++;
+         line_number++;
+         fprintf(stderr, "%-6d %-4s", line_number, "-");
       }
    }
    fprintf(stderr, "*******\n");
-   exit(-1);
+   //   exit(-1);
 }
 
 int
@@ -958,6 +955,7 @@ main(int argc
    int jj;
 
    (void)argc;
+   program_name = argv_ppc[0];
    jj = yyparse();
    fprintf(stderr, "%s:", argv_ppc[0]);
    if (jj != 0) {

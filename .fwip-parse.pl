@@ -1,5 +1,7 @@
 #! /usr/bin/perl -W
 #    Copyright (C) 2017-2020 by Kevin D. Woerner
+# 2020-07-29 kdw  block-def work
+# 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-05-29 kdw  more self-contained
 # 2020-01-07 kdw  getopt line updated
 # 2019-07-12 kdw  K[W]_D[I]R_.* env vars
@@ -171,15 +173,15 @@ for (my $ii = 0; $ii < $#jj; $ii += 2) {
                }
             } elsif ($line =~ s/^\s*(LANGUAGE_END)\b//) {
                lf_push_token("FWIP PRE", "$1");
-            } elsif ($line =~ s/^(LOCAL_CONST)\s+(\w+)\s*(=)\s*
+            } elsif ($line =~ s/^(BLOCK_CONST)\s+(\w+)\s*(=)\s*
                         //x) {
                my @tt = ($1, $2, $3);
                $seen_replace .= "|$tt[1]";
-               lf_push_token("FWIP PRE-LOCAL_CONST", "$tt[0]");
-               lf_push_token("LOCAL_CONST-NAME", "$tt[1]");
-               lf_push_token("LOCAL_CONST-EQ", "$tt[2]");
+               lf_push_token("FWIP PRE-BLOCK_CONST", "$tt[0]");
+               lf_push_token("BLOCK_CONST-NAME", "$tt[1]");
+               lf_push_token("BLOCK_CONST-EQ", "$tt[2]");
                $seen_constants{$tt[1]} = 1;
-               end_set("PRE-LOCAL_CONST");
+               end_set("PRE-BLOCK_CONST");
             } elsif ($line =~ s/^(\?\?\w*)//) {
                lf_push_token("FWIP PREPRE", "$1");
             } elsif ($line =~ s/^(\?\w+)//) {
@@ -193,7 +195,7 @@ for (my $ii = 0; $ii < $#jj; $ii += 2) {
                $seen_constants{$aa[1]} = 0;
                end_set("CONSTANT");
                $seen_cnst .= "|$aa[1]";
-            } elsif ($line =~ s/^(LOCAL_FUNC|FUNC)\b//) {
+            } elsif ($line =~ s/^(BLOCK_FUNC|FUNC)\b//) {
                $oo = $1;
                indent_set("$oo-DEF");
                $scope = ""; # "FUNC-$oo-";
@@ -217,12 +219,12 @@ for (my $ii = 0; $ii < $#jj; $ii += 2) {
                      end_set("$scope$oo");
                   }
                }
-            } elsif ($line =~ s/^(LOCAL_USE)\b//) {
+            } elsif ($line =~ s/^(BLOCK_USE)\b//) {
                $oo = $1;
                lf_push_token("FWIP VAR-$oo", $oo);
                end_set("VAR-$oo");
                $scope = "VAR-$oo-";
-            } elsif ($line =~ s/^(MASTER)\b//) {
+            } elsif ($line =~ s/^(IMPORT_MASTER)\b//) {
                $oo = $1;
                lf_push_token("FWIP $oo", $oo);
                end_set($oo);
@@ -344,7 +346,7 @@ for (my $ii = 0; $ii < $#jj; $ii += 2) {
                $seen_constants{$oo}++;
             } elsif ($line =~ s/^($seen_replace)\b//) {
                $oo = $1;
-               lf_push_token("LOCAL_CONST-USE", $oo);
+               lf_push_token("BLOCK_CONST-USE", $oo);
                $seen_constants{$oo}++;
             } elsif ($line =~ s/^($rxp_fn)\s*(?=\()//) {
                lf_func("FUNCTION", "$1");

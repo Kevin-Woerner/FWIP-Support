@@ -1,6 +1,7 @@
 #! /usr/bin/perl -W
 #    Copyright (C) 2017-2020 by Kevin D. Woerner
 # take the output of fwip-parse, and 'nicely' format it
+# 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-07-09 kdw  mode-extended rmd
 # 2020-05-20 kdw  made more .fw.pl compatible
 # 2020-05-13 kdw  trivially changed
@@ -158,7 +159,7 @@ sub print_curr($ )
          # previous subst is overly aggressive wrt stuff
          $curr_line =~ s/\b(AND|X?OR|NOT|(ELS)?IF|RETURN)\(
                /$1 (/xg;
-         $curr_line =~ s/(\s*)((?:LOCAL_)?CONST)\s+(\w+)\s*(=)\s*
+         $curr_line =~ s/(\s*)((?:BLOCK_)?CONST)\s+(\w+)\s*(=)\s*
                /$1$2 $3 $4 /gx;
 
          $curr_line =~ s/([,=])\s+([+-])\s+([0-9])/$1 $2$3/g;
@@ -310,7 +311,7 @@ print_curr($curr_line);
 # join comments following a const def
 for (my $ii = 0; $ii < $#out; $ii++) {
    if ($out[$ii + 1] =~ m/^\s*$lv_cm0/) {
-      if ($out[$ii] =~ m/^ *(ARRAY(_END)?|CONST|LOCAL_CONST)\b/
+      if ($out[$ii] =~ m/^ *(ARRAY(_END)?|CONST|BLOCK_CONST)\b/
             or $out[$ii] =~ m/^ *(BLOCK|BLOCK_END\b)/
             or $out[$ii] =~ m/^ *(LANGUAGE(_END|_NOT)?\b)/) {
          $out[$ii + 1] =~ s/^\s*//;

@@ -1,5 +1,6 @@
 #! /usr/bin/perl -W
 #    Copyright (C) 2020 by Kevin D. Woerner
+# 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-06-22 kdw  simplified
 # 2020-06-18 kdw  opt arg for fw[i]pc_comm
 # 2020-06-04 kdw  -vv command line opt
@@ -62,7 +63,8 @@ while (<>) {
          for (my $ii=0; $ii <= $#kw; $ii++) {
             print STDERR "KW[$ii]=$kw[$ii]\n";
          }
-         die "TY=$ty\n#kw=$#kw\nLN=$ln\nre=$rest\n";
+         die "SORRY: kw[$ty] not defined\n"
+            . "\$#kw=$#kw\nLINENUMBER=$ln\nre=$rest\n";
       }
       my $desc = $kw[$ty];
       if ($verbose) {
@@ -116,7 +118,7 @@ while (<>) {
 }
 
 for (my $ii = 0; $ii < $#out_arr; $ii++) {
-   if ($out_arr[$ii] =~ m/^ *((LOCAL_)?CONST)/
+   if ($out_arr[$ii] =~ m/^ *((BLOCK_)?CONST)/
             and $out_arr[$ii + 1] =~ m/^ *(#\S+)$/) {
       $out_arr[$ii] =~ s/\n$//s;
       $out_arr[$ii + 1] =~ s/^ *//;
