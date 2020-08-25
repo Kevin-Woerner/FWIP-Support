@@ -1,4 +1,5 @@
 //   Copyright (C) 2018-2020 by Kevin D. Woerner
+// 2020-08-20 kdw  boolean expr change
 // 2020-07-30 kdw  clean up
 // 2020-07-29 kdw  block-def work
 // 2020-07-25 kdw  s/BITWISE/BIT/
@@ -349,11 +350,12 @@ assignable_value_eq1 :
 num_cmp_eq1 : "==" | "<>" | ">=" | ">" | "<=" | "<" ;
 
 bol_expr_com :
-   FUNC_NAME "(" funcarg_ge0 ")"
+   "(" bol_expr_com ")"
+   | FUNC_NAME "(" funcarg_ge0 ")"
+   | "(" FUNC_NAME "(" funcarg_ge0 ")" ")" // WTF
    | VAR_NAME
    | num_expr_eq1 num_cmp_eq1 num_expr_eq1
    | NOT_KW bol_expr_com
-   | "(" bol_expr_com ")"
    | bol_expr_com AND_KW bol_expr_com
    | bol_expr_com OR_KW bol_expr_com
    | bol_expr_com XOR_KW bol_expr_com ;

@@ -1,6 +1,8 @@
 #! /usr/bin/perl -W
 #    Copyright (C) 2015-2020 by Kevin D. Woerner
 # FWIP (Functions Written In Pseudocode) Processor
+# 2020-08-25 kdw  var renam
+# 2020-08-17 kdw  macro syntax changed
 # 2020-07-29 kdw  block-def work
 # 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-07-20 kdw  arraylast work
@@ -97,7 +99,7 @@
 # 2019-03-08 kdw  is[e]qual -> is[e]q, et al.
 # 2019-03-04 kdw  loop-limit work
 # 2019-03-01 kdw  writeable keyword
-# 2019-02-28 kdw  REP?LACE/DEF?INE work
+# 2019-02-28 kdw  REP[L]ACE/DE[F]INE work
 # 2019-02-04 kdw  C: include std[b]ool
 # 2019-02-04 kdw  PERL: prototype work
 # 2019-01-31 kdw  assign snafu
@@ -237,7 +239,7 @@
 # 2017-02-27 kdw  PA?SS deprecated
 # 2017-02-26 kdw  VARYLOG: refactor
 # 2017-02-25 kdw  VARYLOG: end comments fixed
-# 2017-02-24 kdw  REP?LACE rework, et al
+# 2017-02-24 kdw  REP[L]ACE rework, et al
 # 2017-02-20 kdw  SE?CANT code indentation
 # 2017-02-14 kdw  FWIP loop refactor
 # 2017-02-13 kdw  IMP?ORT changed
@@ -885,15 +887,15 @@ foreach (@input_lines) {
       s/$rxp_mn//g;
 
       if (s/\bCONST\s+(\w+)\b\s*(\S.*?);//s) {
-         my ($name, $val) = ($1, $2);
-         $val =~ s/\b(SQRT|EXP)\b/\L$1/g;
-         $val =~ s/\bLN\b\s*\(/ln(/g;
-         $val =~ s%\bATAN2\s*\((.*?),(.*?)\)%atan(($1)/($2))%g;
+         my ($name, $valu) = ($1, $2);
+         $valu =~ s/\b(SQRT|EXP)\b/\L$1/g;
+         $valu =~ s/\bLN\b\s*\(/ln(/g;
+         $valu =~ s%\bATAN2\s*\((.*?),(.*?)\)%atan(($1)/($2))%g;
          $_ = "";
-         if ($val eq "1.0") {
-            $val = lc($name);
+         if ($valu eq "1.0") {
+            $valu = lc($name);
          }
-         $_ .= lf_cmadd(sprintf("%s %s", $name, $val));
+         $_ .= lf_cmadd(sprintf("%s %s", $name, $valu));
       } else {
          $_ = "";
       }
@@ -923,13 +925,13 @@ foreach (@input_lines) {
 
       # PERL ---- ----- ----- ----- ----- ----- ----- ----- -----
       if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
-         my ($what, $name, $val) = ($1, $2, $3);
+         my ($what, $name, $valu) = ($1, $2, $3);
          $name =~ s/^\$//;
          my $cxnamel = funcyaddcnx($name, $what);
          push(@cx_funs
                , lf_cmadd(sprintf("sub %s { $name }"
                      , "$cxnamel()"), 1));
-         $_ = lf_cmadd(sprintf("sub %s { $val; }"
+         $_ = lf_cmadd(sprintf("sub %s { $valu; }"
          , "$name()"));
       }
 
@@ -1037,12 +1039,12 @@ foreach (@input_lines) {
 #      s/^\bIMPORT\s*\"(.*?)\"\s*;/from $1 import *\n/;
       # PYTHON -- ----- ----- ----- ----- ----- ----- ----- -----
       if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
-         my ($what, $name, $val) = ($1, $2, $3);
+         my ($what, $name, $valu) = ($1, $2, $3);
          my $cxnamel = funcyaddcnx($name, $what);
          push(@cx_funs
                , lf_cmadd(sprintf("%s = ($name)"
                      , $cxnamel), 1));
-         $_ = lf_cmadd(sprintf("%s = $val", $name));
+         $_ = lf_cmadd(sprintf("%s = $valu", $name));
       }
 
       if (m/\bRETURN\b\s*(.*?);/ and "INT" eq
@@ -1125,19 +1127,19 @@ foreach (@input_lines) {
       }
       # VB6 ----- ----- ----- ----- ----- ----- ----- ----- -----
       if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
-         my ($what, $name, $val) = ($1, $2, $3);
+         my ($what, $name, $valu) = ($1, $2, $3);
          my $ty = ("Double");
 #         $_ = "";
          my $pp = ($what =~ m/BLOCK_DEF/ ? "Private" : "Public");
          my $cxnamel = funcyaddcnx($name, $what);
-         $val =~ s/SQRT\s*\((.+)\)/($1) ^ 0.5/;
+         $valu =~ s/SQRT\s*\((.+)\)/($1) ^ 0.5/;
          # VB6 doesnt do self-ref modules
-         $val =~ s/$package_name\.//g;
+         $valu =~ s/$package_name\.//g;
          push(@cx_funs
             , lf_cmadd("$pp Function $cxnamel() As $ty\n"
                   . "${bq}$cxnamel = $name\n"
                   . "End Function", 1));
-         $_ = lf_cmadd("$pp Const $name As $ty = $val");
+         $_ = lf_cmadd("$pp Const $name As $ty = $valu");
 =pod
          my $mlm = Fwip_Comment::FWIPC_LINE_LENGTH + 1;
          foreach ($cx_funs[$#cx_funs], $_) {
@@ -1253,16 +1255,16 @@ foreach (@input_lines) {
       }
       # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- -----
       if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
-         my ($what, $name, $val) = ($1, $2, $3);
+         my ($what, $name, $valu) = ($1, $2, $3);
          my $ty = "Double";
          $_ = "";
          my $pp = ($what =~ m/BLOCK_DEF/ ? "Private" : "Public")
             . " Shared";
          my $cxnamel = funcyaddcnx($name, $what);
-         $val =~ s/SQRT\s*\((.+)\)/($1) ^ 0.5/;
+         $valu =~ s/SQRT\s*\((.+)\)/($1) ^ 0.5/;
          # VB6 doesnt do self-ref modules
-         $val =~ s/$package_name\.//g;
-         $_ = lf_cmadd("$pp Const $name As $ty = $val");
+         $valu =~ s/$package_name\.//g;
+         $_ = lf_cmadd("$pp Const $name As $ty = $valu");
       }
 
       if (s/(?<!\bAs)(\s*)($rxp_vd)\s+($rxp_an\b)\[(.*)\]
@@ -1380,12 +1382,12 @@ foreach (@input_lines) {
       # H - ----- ----- ----- ----- ----- ----- ----- ----- -----
       # RPN ----- ----- ----- ----- ----- ----- ----- ----- -----
       if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
-         my ($what, $name, $val) = ($1, $2, $3);
+         my ($what, $name, $valu) = ($1, $2, $3);
          my $ty = ($what eq "BLOCK_DEF" ? "long" : "double");
          $_ = "";
          my $cxnamel = funcyaddcnx($name, $what);
-         $val =~ s/\b(SQRT|EXP)\b/\L$1/g;
-         $val =~ s/\bLN\b\s*\(/log(/g;
+         $valu =~ s/\b(SQRT|EXP)\b/\L$1/g;
+         $valu =~ s/\bLN\b\s*\(/log(/g;
          if ($what !~ m/BLOCK_DEF/) {
             push(@cx_funs
                , lf_cmadd(sprintf("$ty %s { return ($name); }"
@@ -1396,7 +1398,7 @@ foreach (@input_lines) {
             }
             if (Fwip_Translate::fwipt_lang_aint(LANG_C)) {
                push(@func_prototype, lf_cmadd(
-                     sprintf("#define %s ($val)", $name), 1));
+                     sprintf("#define %s ($valu)", $name), 1));
                if (Fwip_Comment::FWIPC_LINE_LENGTH
                         < length($func_prototype[-1])) {
                   $func_prototype[-1] =~ s/(\#define\s+\S+)
@@ -1408,7 +1410,7 @@ foreach (@input_lines) {
             $_ = "";
          } else {
             if (Fwip_Translate::fwipt_lang_is(LANG_C)) {
-               $_ = sprintf("#define %s ($val)", $name);
+               $_ = sprintf("#define %s ($valu)", $name);
             } else {
                $_ = "";
             }
@@ -1466,20 +1468,20 @@ foreach (@input_lines) {
       s/^\b(IMPORT\s*\"(.*?)\"\s*;)/$cmout0$1\n/;
       # BC  ----- ----- ----- ----- ----- ----- ----- ----- -----
       if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
-         my ($what, $name, $val) = ($1, $2, $3);
+         my ($what, $name, $valu) = ($1, $2, $3);
          my $cxnamel = funcyaddcnx($name, $what);
-         $val =~ s/EXP\s*\(/e(/g;
-         $val =~ s/LN\s*\(/l(/g;
-         $val =~ s@ATAN2\s*\((.+?),\s*(.+?)\)@a(($1) / ($2))@g;
-         $val =~ s/(\d+(\.\d+)?)[eE]\+?(-?\d+)/($1 * 10^$3)/g;
-         $val =~ s/([A-Z0-9_]+\()/ lc($1) /eg;
+         $valu =~ s/EXP\s*\(/e(/g;
+         $valu =~ s/LN\s*\(/l(/g;
+         $valu =~ s@ATAN2\s*\((.+?),\s*(.+?)\)@a(($1) / ($2))@g;
+         $valu =~ s/(\d+(\.\d+)?)[eE]\+?(-?\d+)/($1 * 10^$3)/g;
+         $valu =~ s/([A-Z0-9_]+\()/ lc($1) /eg;
 
          if ($cxnamel ne $name) {
 #            push(@cx_funs
 #                 , lf_cmadd(sprintf("%s = ($name);"
 #                     , $cxnamel), 1));
          }
-         $_ = lf_cmadd(sprintf("%s = $val;", $cxnamel));
+         $_ = lf_cmadd(sprintf("%s = $valu;", $cxnamel));
       }
 
       s/\*\*/^/g;
@@ -1554,7 +1556,7 @@ foreach (@input_lines) {
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_VB6
                , LANG_VBDOTNET)) {
       if (Fwip_Translate::fwipt_lang_is(LANG_VB6)) {
-         # change "var += val" into "var = var + val", et al.
+         # change "var += valu" into "var = var + valu", et al.
          s@(\s*)(\S+)\s*([-+/*]|\<\<|\>\>)=(.*)@$1$2 = $2 $3$4@x;
       }
       if (s/\b(Private)\s+(Long|Double|String|Boolean)
@@ -1685,7 +1687,7 @@ sub joinrx($ )
             or ($gg =~ s/\(\|([^()]+)\)/($1)?/g)
             or ($gg =~ s/\(\|([^()]*\([^()]+\)[^()]*)\)/($1)?/g)
             or ($gg =~ s/\(([^()]+)\|\)/($1)?/g)
-            or ($gg =~ s/\?\?/?/g)
+            or ($gg =~ s/\?{2,}/?/g)
             or ($gg =~ s/\((.)\)/$1/g)
             or ($gg =~ s/\((\w+)\)([^?*+])/$1$2/g)
             or ($gg =~ s/\(([^|()]+?)(.+)

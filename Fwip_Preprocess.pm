@@ -1,5 +1,6 @@
 package Fwip_Preprocess;
 #    Copyright (C) 2018-2020 by Kevin D. Woerner
+# 2020-08-17 kdw  macro syntax changed
 # 2020-06-05 kdw  more verbose error checking
 # 2020-05-29 kdw  more info in die statement
 # 2020-04-17 kdw  multi-line comment support rmed
@@ -12,7 +13,7 @@ package Fwip_Preprocess;
 # 2019-07-12 kdw  K[W]_D[I]R_.* env vars
 # 2019-04-22 kdw  F[U]NC keyword
 # 2019-03-18 kdw  macro syntax changed
-# 2019-02-28 kdw  REP?LACE/DEF?INE work
+# 2019-02-28 kdw  REP[L]ACE/DE[F]INE work
 # 2019-02-19 kdw  macro syntax
 # 2018-12-18 kdw  kwelements separated
 # 2018-12-07 kdw  explicit imported funcitons
@@ -55,7 +56,7 @@ sub fwippp_preprocess(;$ )
    }
 
    my %ift_seen = ();
-   my $ppsgl = "??";
+   my $ppsgl = "?";
    my $ppqm = quotemeta($ppsgl);
    my $ift = "${ppqm}INSERT_FILE\\s*\\\"(.*?)\\\"\\s*${ppqm}";
    while ($slurp =~ m/$ift/) {
@@ -98,40 +99,40 @@ sub fwippp_preprocess(;$ )
    }
 
    die if ($slurp =~ m/^[^#]*${ppqm}MACRO/);
-
+   my $macro_regx = join("|", @macro_names);
    # Now we've found all the macro definitions.
    # Now replace macroes by first finding macroes that are
    # not inside other macroes...
-   while ($slurp =~ m/(${ppqm}(\w+)\b([^\?]*?)${ppqm}\B)/m) {
+   while ($slurp =~ m/(${ppqm}($macro_regx)\b([^\?]*?)
+            ${ppqm}\B)/xm) {
       my ($all, $macname, $arg) = ($1, $2, $3);
       $arg =~ s/^\s+//;
       $arg =~ s/\s+$//;
       my @macro_args = split(/\s*[\$;]\s*/, $arg);
 
-      if (!defined($macro_defs{$macname})) {
-         die "$slurp\n$_[0]\nMacro $macname not defined\n";
-      }
-      my $macro_def = $macro_defs{$macname}->{DEF};
-      my @var = (@{$macro_defs{$macname}->{VAR}});
+      if (defined($macro_defs{$macname})) {
+         my $macro_def = $macro_defs{$macname}->{DEF};
+         my @var = (@{$macro_defs{$macname}->{VAR}});
 
-      foreach my $ii (0..$#macro_args) {
-         my $to = $macro_args[$ii];
-         if ($to eq "\"\"") {
-            $to = "";
+         foreach my $ii (0..$#macro_args) {
+            my $to = $macro_args[$ii];
+            if ($to eq "\"\"") {
+               $to = "";
+            }
+            if (!defined($var[$ii])) {
+               die "OOPS:indedx=$ii TO=$to $macname\n$macro_def";
+            }
+            $macro_def =~ s/$var[$ii]/$to/g;
          }
-         if (!defined($var[$ii])) {
-            die "OOPS: indedx=$ii TO=$to $macname\n$macro_def";
-         }
-         $macro_def =~ s/$var[$ii]/$to/g;
-      }
 
-      my $ff = quotemeta($all);
-      if (0 == ($slurp =~ s/$ff/$macro_def/m)) {
-         die "$slurp\nMACRO:$macname"
-            . join("\nARGS:", "",@macro_args,"")
-            . "\nALL:$all\n"
-            . "DEF:$macro_def\n"
-            . "FAILURE IN MACRO SUBSTITUTION\n";
+         my $ff = quotemeta($all);
+         if (0 == ($slurp =~ s/$ff/$macro_def/m)) {
+            die "$slurp\nMACRO:$macname"
+               . join("\nARGS:", "",@macro_args,"")
+               . "\nALL:$all\n"
+               . "DEF:$macro_def\n"
+               . "FAILURE IN MACRO SUBSTITUTION\n";
+         }
       }
    }
 

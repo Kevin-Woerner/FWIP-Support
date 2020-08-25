@@ -38,6 +38,7 @@ Char
 Class
 Const
 Continue
+Cos
 Date
 Decimal
 Declare
@@ -130,6 +131,7 @@ Set
 Shadows
 Shared
 Short
+Sin
 Single
 Static
 Step
@@ -138,6 +140,7 @@ String
 Structure
 Sub
 SyncLock
+Tan
 Then
 Throw
 To
@@ -149,6 +152,7 @@ UInteger
 ULong
 UShort
 Using
+Val
 Variant
 Wend
 When

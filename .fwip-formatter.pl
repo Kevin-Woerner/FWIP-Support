@@ -1,6 +1,7 @@
 #! /usr/bin/perl -W
 #    Copyright (C) 2017-2020 by Kevin D. Woerner
 # take the output of fwip-parse, and 'nicely' format it
+# 2020-08-17 kdw  macro syntax changed
 # 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-07-09 kdw  mode-extended rmd
 # 2020-05-20 kdw  made more .fw.pl compatible
@@ -33,7 +34,7 @@
 # 2019-04-17 kdw  *_DO, THEN work
 # 2019-04-04 kdw  .*_L[O]OP keywords deprecated
 # 2019-03-08 kdw  is[e]qual -> is[e]q, et al.
-# 2019-02-28 kdw  REP?LACE/DEF?INE work
+# 2019-02-28 kdw  REP[L]ACE/DE[F]INE work
 # 2019-01-31 kdw  probs w/ new keywords followed by (
 # 2019-01-23 kdw  add-sub-div-mul keywords
 # 2019-01-03 kdw  indcc, et al.

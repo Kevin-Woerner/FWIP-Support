@@ -1,5 +1,6 @@
 #! /usr/bin/perl -W
 #    Copyright (C) 2016-2020 by Kevin D. Woerner
+# 2020-08-17 kdw  macro syntax changed
 # 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-05-13 kdw  lang comment trivially changed
 # 2020-05-12 kdw  language syntax
@@ -14,7 +15,7 @@
 # 2019-05-29 kdw  comment changed
 # 2019-04-22 kdw  F[U]NC keyword
 # 2019-03-08 kdw  is[e]qual -> is[e]q, et al.
-# 2019-02-28 kdw  REP?LACE/DEF?INE work
+# 2019-02-28 kdw  REP[L]ACE/DE[F]INE work
 # 2019-02-28 kdw  rmed @replace
 # 2018-12-07 kdw  explicit imported funcitons
 # 2018-05-18 kdw  LAN?GUAGE syntax change
@@ -74,7 +75,7 @@ if (!Getopt::Long::GetOptions("v+", \$verbose_flag)) {
 for (my $ii = 0 ; $ii <= $#ARGV ; $ii++) {
    open(FH, "< $ARGV[$ii]") or die "$ARGV[$ii]";
    while (<FH>) {
-      if (m/\?\?INSERT_FILE +\"(.*)\"/) {
+      if (m/\?INSERT_FILE +\"(.*)\"/) {
          push(@ARGV, $1);
       }
    }
@@ -137,21 +138,21 @@ while (my $ln = <>) {
    }
    s/\".*?\"//g;
 
-   while (s/(\?\?MACRO_END)//) {
+   while (s/(\?MACRO_END)//) {
       addd($1, $current_filename);
       $fwip_pp{$1}++;
    }
-   while (s/(\?\?MACRO)\s+(\w+)(.*?)\?\?//) {
+   while (s/(\?MACRO)\s+(\w+)(.*?)\?//) {
       addd($1, $current_filename);
       $fwip_pp{$1}++;
-      addd("\?\?$2", $current_filename);
-      $macro_def{"\?\?$2"}++;
+      addd("\?$2", $current_filename);
+      $macro_def{"\?$2"}++;
    }
-   while (s/(\?\?\w+).*?\?\?//) {
+   while (s/(\?\w+).*?\?//) {
       addd($1, $current_filename);
       $macro_use{$1}++;
    }
-   while (s/(\?\?\B)//) {
+   while (s/(\?\B)//) {
       addd($1, $current_filename);
       $fwip_pp{$1}++;
    }
