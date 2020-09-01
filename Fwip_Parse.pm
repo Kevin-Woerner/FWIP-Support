@@ -1,5 +1,6 @@
 package Fwip_Parse;
 #    Copyright (C) 2017-2020 by Kevin D. Woerner
+# 2020-08-29 kdw  _a[r]r changed to _mt[r]x
 # 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-05-29 kdw  major simplification
 # 2020-05-26 kdw  simplified rx
@@ -106,7 +107,10 @@ use strict;
 
 sub rxo_functionname() { "\\b[a-zA-Z]\\w+\\b"; }
 sub rxo_variablename() { "\\b[a-z]+[a-z_]*\\b";}
-sub rxo_arrayname()    { "\\b[a-z]+[a-z_]*_arr(?:_pc?)?\\b";}
+sub rxo_arrayname()
+{
+   "\\b[a-z]+[a-z_]*_(?:arr|mtrx)(?:_pc?)?\\b";
+}
 sub rxo_constantname() { "\\b(?:[a-zA-Z]\\w+|E)\\b";}
 sub rxo_modulename()   { "\\b[a-zA-Z_]\\w+\\b";}
 sub rx_modulename()

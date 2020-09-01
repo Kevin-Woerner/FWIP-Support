@@ -1,6 +1,7 @@
 #! /usr/bin/perl -W
 #    Copyright (C) 2015-2020 by Kevin D. Woerner
 # FWIP (Functions Written In Pseudocode) Processor
+# 2020-08-29 kdw  _a[r]r changed to _mt[r]x
 # 2020-08-25 kdw  var renam
 # 2020-08-17 kdw  macro syntax changed
 # 2020-07-29 kdw  block-def work
@@ -2101,18 +2102,22 @@ if (Fwip_Translate::fwipt_lang_is(LANG_BC)) {
    # join together all var decls into one decl.
    my $prev_line;
    for (my $sg = 0; $sg < $#outa; $sg++) {
-      if ($outa[$sg] =~ m/^ *auto /) {
+      if ($outa[$sg] =~ m/^ +auto /) {
          if ($outa[$sg + 1] =~ m/^ *\# Global Bc +/) {
             splice(@outa, $sg + 1, 1);
             redo;
          }
-         if ($outa[$sg + 1] =~ s/^ *auto +//) {
+         if ($outa[$sg + 1] =~ s/^ +auto +//) {
             $outa[$sg] =~ s/;$/", " . $outa[$sg + 1]/eg;
             splice(@outa, $sg + 1, 1);
             redo;
          }
          # in BC all arrays are auto sized
          $outa[$sg] =~ s/\[[^]]+\]/[]/g;
+      }
+      if ($outa[$sg] =~ s/^auto //) {
+         $outa[$sg] =~ s/\];/] = 0;/;
+         $outa[$sg] =~ s/\[\w+\]/[0]/g;
       }
    }
 }
