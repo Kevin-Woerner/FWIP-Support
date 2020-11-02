@@ -1,6 +1,7 @@
 #! /usr/bin/perl -W
 #    Copyright (C) 2015-2020 by Kevin D. Woerner
 # FWIP (Functions Written In Pseudocode) Processor
+# 2020-09-08 kdw  VBDOTNET: "private dim" to "private shared"
 # 2020-08-29 kdw  _a[r]r changed to _mt[r]x
 # 2020-08-25 kdw  var renam
 # 2020-08-17 kdw  macro syntax changed
@@ -2165,10 +2166,11 @@ foreach (@outb) {
       }
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_VBDOTNET)) {
       # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- -----
+      s/\bPrivate Dim /Private Shared /g;
       s/Private lv_/Private Shared lv_/g;
       s/ Shared Shared/ Shared/g;
       s/ Shared Const / Const /g;
-      s/Private( Shared \w+\()/Friend $1/g;
+#      s/Private( Shared \w+\()/Friend $1/g;
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_PERL)) {
       # PERL ---- ----- ----- ----- ----- ----- ----- ----- -----
       if (m/^[^#]*$rxp_mn/) {
