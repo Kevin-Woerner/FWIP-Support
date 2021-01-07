@@ -1,10 +1,13 @@
 package Fwip_Preprocess;
 #    Copyright (C) 2018-2020 by Kevin D. Woerner
+# 2020-12-04 kdw  rm excess space from macros
+# 2020-11-29 kdw  rm debugging code
+# 2020-11-28 kdw  macro syntax overhaul
 # 2020-08-17 kdw  macro syntax changed
 # 2020-06-05 kdw  more verbose error checking
 # 2020-05-29 kdw  more info in die statement
 # 2020-04-17 kdw  multi-line comment support rmed
-# 2020-04-08 kdw  ppsgl et al.
+# 2020-04-08 kdw  pp[s]gl et al.
 # 2020-03-02 kdw  .*_NE[X]T really deprecated
 # 2020-03-01 kdw  .*_NE[X]T deprecated, et al.
 # 2019-12-13 kdw  (\w+) work
@@ -56,9 +59,9 @@ sub fwippp_preprocess(;$ )
    }
 
    my %ift_seen = ();
-   my $ppsgl = "?";
-   my $ppqm = quotemeta($ppsgl);
-   my $ift = "${ppqm}INSERT_FILE\\s*\\\"(.*?)\\\"\\s*${ppqm}";
+   my $ppqm_beg = quotemeta("?");
+   my $ppqm_end = quotemeta("?");
+   my $ift = "\\{INSERT_FILE\\s*\\\"(.*?)\\\"\\s*\\}";
    while ($slurp =~ m/$ift/) {
       my $filenam = ($1);
       my $fbn = $filenam;
@@ -82,33 +85,37 @@ sub fwippp_preprocess(;$ )
       $ftext .= Fwip_Comment::fwipc_comm("Insert-End", $filenam);
       $slurp =~ s/$ift/$ftext/;
    }
-
    $slurp =~ s/\s*\\\n\s*/ /gm;
 
    # find all macros & their definitions
    my %macro_defs = ();
    my @macro_names = ();
-   while ($slurp =~ s/${ppqm}MACRO\s+(\w+)\b  # macroname
-         \s*([^\?]*?)\s*                   # macroargs
-         ${ppqm}(.*?)                         # macrodef
-         ${ppqm}MACRO_END\b//xsm) {
+   while ($slurp =~ s/\{MACRO\s+         # macrostart
+         (\w+)\b                              # macroname
+         \s*([^\{]*?)\s*                      # macroargs
+         \{
+         (.*?)                                # macrodef
+         \}\}//xsm) {
       my ($nam, $vars, $def) = ($1, $2, $3);
       push(@macro_names, $nam);
+      $def =~ s/^\s+//;
+      $def =~ s/\s+$//;
       $macro_defs{$nam}->{DEF} = $def;
       @{$macro_defs{$nam}->{VAR}} = split(/\s*[\$;]\s*/, $vars);
    }
 
-   die if ($slurp =~ m/^[^#]*${ppqm}MACRO/);
+   die if ($slurp =~ m/^[^#]*\{MACRO/);
    my $macro_regx = join("|", @macro_names);
    # Now we've found all the macro definitions.
    # Now replace macroes by first finding macroes that are
    # not inside other macroes...
-   while ($slurp =~ m/(${ppqm}($macro_regx)\b([^\?]*?)
-            ${ppqm}\B)/xm) {
+   while ($slurp =~ m/(\{($macro_regx)\b
+            ([^{}]*?)
+            \}\B)/xm) {
       my ($all, $macname, $arg) = ($1, $2, $3);
       $arg =~ s/^\s+//;
       $arg =~ s/\s+$//;
-      my @macro_args = split(/\s*[\$;]\s*/, $arg);
+      my @macro_args = split(/\s*;\s*/, $arg);
 
       if (defined($macro_defs{$macname})) {
          my $macro_def = $macro_defs{$macname}->{DEF};
@@ -120,7 +127,12 @@ sub fwippp_preprocess(;$ )
                $to = "";
             }
             if (!defined($var[$ii])) {
-               die "OOPS:indedx=$ii TO=$to $macname\n$macro_def";
+               die "OOPS:II=$ii\n"
+                  . "TOO=$to\n"
+                  . "NAM=$macname\n"
+                  . "ARG=$arg\n"
+                  . "ALL=$all\n"
+                  . "DEF=$macro_def";
             }
             $macro_def =~ s/$var[$ii]/$to/g;
          }
@@ -136,11 +148,9 @@ sub fwippp_preprocess(;$ )
       }
    }
 
-   die if ($slurp =~ m/^[^#]*\bDEFINE\b/);
-
    $slurp =~ s/([^A-Za-z0-9_])\(([A-Za-z0-9_]+)\)/$1$2/g;
 
-   if ($slurp =~ m/(${ppqm}[A-Z]+.*?;)/) {
+   if ($slurp =~ m/(${ppqm_beg}[A-Z]+.*?;)/) {
       die "Preprocess Failure:\n$slurp\nCode contains $1";
    }
 

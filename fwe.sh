@@ -1,5 +1,7 @@
 #! /bin/bash
 #    Copyright (C) 2019-2020 by Kevin D. Woerner
+# 2020-11-30 kdw  osdep comment change
+# 2020-11-27 kdw  no net change
 # 2020-06-30 kdw  BC: change resolution
 # 2020-04-10 kdw  error message
 # 2020-03-27 kdw  rpn work
@@ -65,17 +67,17 @@ EOF
 fi
 
 if [[ 0 -eq $vb_flag && 0 -eq $c_flag && 0 -eq $bc_flag &&\
-         0 -eq $gg_flag && 0 -eq $py_flag && 0 -eq $pl_flag &&\
-         0 -eq $rpn_flag ]] ; then
+         0 -eq $gg_flag && 0 -eq $py_flag &&\
+         0 -eq $pl_flag && 0 -eq $rpn_flag ]] ; then
    c_flag=1
    py_flag=1
    pl_flag=1
    gg_flag=1
    bc_flag=1
    rpn_flag=1
-   if [ -n "$CYGWIN" ] ; then
-      vb_flag=1
-   fi
+   if [ -n "$CYGWIN" ] ; then   # OS dep CYG
+      vb_flag=1                 # OS dep CYG
+   fi                           # OS dep
 fi
 
 strc=""
@@ -158,7 +160,7 @@ if [ ${#arg_arr[@]} -le 0 ] ; then
    else
       silly=$(grep -E "#TEST:" "${file_arr[@]}" |
             perl -pe "s/[; ]+//g;s/.*#TEST://;
-               s@(.*)==(.*)@(\$1)-(\$2)\n(\$1)/(\$2)-1@;")
+               s@(.*)==(.*)@(\$1)/(\$2)-1\n(\$1)-(\$2)@;")
    fi
 else
    silly=${arg_arr[@]}

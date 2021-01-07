@@ -1,5 +1,6 @@
 #! /usr/bin/perl -W
 #    Copyright (C) 2016-2020 by Kevin D. Woerner
+# 2020-11-22 kdw  uniqified output
 # 2020-06-25 kdw  -J option
 # 2020-06-01 kdw  output format changed
 # 2020-05-30 kdw  CONST syntax change
@@ -164,7 +165,7 @@ foreach $argq (@fwip_files) {
                $fdef =~ s/^/$file_arr[$#file_arr]:/gm;
             }
             push(@outz, $fdef);
-            $seen{$fname} = $fdef;
+            $seen{$fname} .= $fdef;
          }
       }
    }
@@ -175,21 +176,30 @@ if (0 <= $#const_arr) {
    my $cmd = join("\n\n", @const_arr, "");
    my $fls = join(" -f ", "", "''"
          , map { s/fwipp/units/;$_ } @fwip_files);
-   my @reply = qx{echo "$cmd" | units -t $fls -o%+22.15E};
+   my @reply = map {
+      chomp;
+      s/.*= //;
+      s/(0+)(0E[+-]\d+)/$2/;
+      s/([1-9])0E/${1}E/;
+      if (!m/ /) {
+         $_ .= " 1";
+      }
+      $_;
+   } qx{echo "$cmd" | units -t $fls -o%+22.15E};
+
    foreach my $ff (0..$#const_arr) {
       my $rr = $reply[$ff];
       my $cc = $const_arr[$ff];
-      chomp($rr);
-      $rr =~ s/.*= //;
-      $rr =~ s/(0+)(0E[+-]\d+)/$2/;
-      $rr =~ s/([1-9])0E/${1}E/;
-      if ($rr !~ m/ /) {
-         $rr .= " 1";
-      }
       my $yy = sprintf("CONST %-23s %-22s ; # %s\n"
             , $cc, split(/ +/, $rr, 2));
-      $seen{$cc} .= $yy;
-      push(@outz, $seen{$cc});
+      if (defined($seen{$cc})) {
+         if ($seen{$cc} ne $yy) {
+            die "$seen{$cc} ne $yy";
+         }
+      } else {
+         $seen{$cc} = $yy;
+         push(@outz, $seen{$cc});
+      }
    }
 }
 
@@ -199,5 +209,5 @@ if ($sort_flag) {
       print "$seen{$fd}";
    }
 } else {
-   print join("", grep { m/./ } @outz);
+   print join("", @outz);
 }
