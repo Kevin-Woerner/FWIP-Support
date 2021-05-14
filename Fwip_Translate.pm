@@ -1,5 +1,13 @@
 package Fwip_Translate;
-#    Copyright (C) 2017-2020 by Kevin D. Woerner
+#    Copyright (C) 2017-2021 by Kevin D. Woerner
+# 2021-05-02 kdw  VBDOTNET: INT translates to Integer
+# 2021-04-16 kdw  rm refs to lang-fwipp
+# 2021-04-13 kdw  RPN debugging
+# 2021-04-07 kdw  VB.*: PtrSafe refs rmed
+# 2021-03-24 kdw  VB.*: long lines
+# 2021-03-11 kdw  C,H,RPN: failed block def work
+# 2021-02-19 kdw  master func work
+# 2021-01-22 kdw  VB.*:rm trivial powers
 # 2020-07-29 kdw  block-def work
 # 2020-07-25 kdw  s/BITWISE/BIT/
 # 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
@@ -149,7 +157,7 @@ use Exporter qw(import);
 @EXPORT = ();
 @EXPORT_OK = (qw(
    LANG_C LANG_H LANG_RPN LANG_VB6 LANG_PERL LANG_PYTHON
-   LANG_VARYLOG LANG_BC LANG_UNITS LANG_FWIPP LANG_VBDOTNET
+   LANG_VARYLOG LANG_BC LANG_UNITS LANG_VBDOTNET
 fwipt_current_function_set
 fwipt_current_function_get
 fwipt_current_function_ret_get
@@ -193,7 +201,6 @@ sub LANG_RPN()          { 7; }
 sub LANG_VARYLOG()      { 8; }
 sub LANG_UNITS()        { 9; }
 sub LANG_VBDOTNET()     { 10; }
-sub LANG_FWIPP()        { -1; }
 
 my $zqbq;
 my $zqbql;
@@ -647,6 +654,10 @@ EOF
             $st =~ s/ \((\w+(\[[^]]\])?)\)\)/ $1)/g;
             next;
          }
+         if ($lv_target_language == LANG_VBDOTNET
+                  or $lv_target_language == LANG_VB6) {
+            $st =~ s/ \^ 1\)/)/g;
+         }
          $st =~ s/ ($zqqt_oprxnotbc) \((\w+)\)/ $1 $2/g;
       }
 
@@ -744,9 +755,7 @@ sub fwipt_lang_set($ )
 {
    $lv_target_language = $_[0];
    my ($bq, $bql) = fwipt_bq_set("   ");
-   if (fwipt_lang_is(LANG_FWIPP)) {
-      lf_lang_fwip();
-   } elsif (fwipt_lang_is(LANG_UNITS)) {
+   if (fwipt_lang_is(LANG_UNITS)) {
       lf_lang_units();
    } elsif (fwipt_lang_is(LANG_PERL)) {
       lf_lang_perl();
@@ -1037,7 +1046,7 @@ BLOCK_USE       $lv_cm0 local-use Vbdotnet
 BLOCK_DEF       Private
 BOL             Boolean
 DBL             Double
-INT             Long
+INT             Integer
 STR             String
 NUL             ""
 RETURN          ""
@@ -1173,11 +1182,7 @@ sub fwipt_initcode($ )
 {
    my ($library_name) = @_;
 
-   if (fwipt_lang_is(LANG_FWIPP)) {
-      (<<EndOfInitCodeBlockFwip);
-IMPORT_MASTER ${library_name};
-EndOfInitCodeBlockFwip
-   } elsif (fwipt_lang_is(LANG_UNITS)) {
+   if (fwipt_lang_is(LANG_UNITS)) {
       (<<EndOfInitCodeBlockUnits);
 EndOfInitCodeBlockUnits
    } elsif (fwipt_lang_is(LANG_PERL)) {
@@ -1199,39 +1204,6 @@ EndOfInitCodeBlockPython
       (<<EndOfInitCodeBlockVB6);
 Attribute VB_Name = "${library_name}"
 Option Explicit
-#If VBA7 Then
-   Private Declare PtrSafe Function timeGetTime _
-         Lib "winmm.dll" () As Long
-#Else
-   Private Type System_Time_Type
-      wYear         As Integer
-      wMonth        As Integer
-      wDayOfWeek    As Integer
-      wDay          As Integer
-      wHour         As Integer
-      wMinute       As Integer
-      wSecond       As Integer
-      wMilliseconds As Integer
-   End Type
-
-   Private Type Time_Zone_Type
-      Bias As Long
-      StandardName(0 To 63) As Byte
-      StandardDate As System_Time_Type
-      StandardBias As Long
-      DaylightName(0 To 63) As Byte
-      DaylightDate As System_Time_Type
-      DaylightBias As Long
-   End Type
-
-   Private Declare Function GetTimeZoneInformation Lib _
-         "kernel32" (lpTimeZoneInformation _
-               As Time_Zone_Type) As Long
-
-   Private Declare Function timeGetTime _
-         Lib "winmm.dll" () As Long
-#EndIf
-Private lv_time_zone_offset As Double
 Private Const vbNL As String = "" & vbNewLine
 EndOfInitCodeBlockVB6
    } elsif (fwipt_lang_is(LANG_VBDOTNET)) {
@@ -1244,16 +1216,18 @@ ${zqbq}Private Const vbNL As String = "" & vbNewLine
 EndOfInitCodeBlockVBDOTNET
    } elsif (fwipt_lang_is(LANG_C)) {
       (<<EndOfInitCodeBlockC);
-#include <stdlib.h>
-#include <stdio.h>
-#include <math.h>
-#include <time.h>
 #include "${library_name}.h"
 EndOfInitCodeBlockC
    } elsif (fwipt_lang_is(LANG_H)) {
       (<<EndOfInitCodeBlockH);
 #ifndef INCLUDED_${library_name}_h
 #define INCLUDED_${library_name}_h
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+#include <time.h>
+#include <sys/time.h>
 EndOfInitCodeBlockH
    } elsif (fwipt_lang_is(LANG_RPN)) {
       (<<EndOfInitCodeBlockRPN);
@@ -1275,11 +1249,7 @@ sub fwipt_master_functions()
    my $master_sub;
    my $master_proto = "";
 
-   if (fwipt_lang_is(LANG_FWIPP)) {
-      $master_sub = "FUNC";
-      $master_functions = <<EndOfMasterFunctionsFwip;
-EndOfMasterFunctionsFwip
-   } elsif (fwipt_lang_is(LANG_UNITS)) {
+   if (fwipt_lang_is(LANG_UNITS)) {
       $master_sub = "";
       $master_functions = <<EndOfMasterFunctionsUnits;
 EndOfMasterFunctionsUnits
@@ -1335,6 +1305,34 @@ EndOfMasterFunctionsPython
    } elsif (fwipt_lang_is(LANG_VB6)) {
       $master_sub = "Public Function";
       $master_functions = <<EndOfMasterFunctionsVB6;
+#If Not VBA7 Then
+   Private Declare Function timeGetTime Lib "winmm.dll" () As Long
+
+   Private Type System_Time_Type
+      wYear         As Integer
+      wMonth        As Integer
+      wDayOfWeek    As Integer
+      wDay          As Integer
+      wHour         As Integer
+      wMinute       As Integer
+      wSecond       As Integer
+      wMilliseconds As Integer
+   End Type
+
+   Private Type Time_Zone_Type
+      Bias As Long
+      StandardName(0 To 63) As Byte
+      StandardDate As System_Time_Type
+      StandardBias As Long
+      DaylightName(0 To 63) As Byte
+      DaylightDate As System_Time_Type
+      DaylightBias As Long
+   End Type
+
+   Private Declare Function GetTimeZoneInformation Lib "kernel32" ( _
+            lpTimeZoneInformation As Time_Zone_Type) As Long
+#EndIf
+Private lv_time_zone_offset As Double
 $master_sub timee() As Double
    Dim tms As Double
    Dim tzi As Time_Zone_Type
@@ -1349,8 +1347,8 @@ $master_sub timee() As Double
       lv_time_zone_offset = lv_time_zone_offset * 60.0
    End If
    tms = timeGetTime()
-   timee = (Now() - \#1/1/1970\#) * 86400.0 _
-         + (tms Mod 1000) / 1000.0 + lv_time_zone_offset
+   timee = (Now() - \#1/1/1970\#) * 86400.0 + (tms Mod 1000) / 1000.0 _
+            + lv_time_zone_offset
 End Function
 $master_sub floor(ByVal xx As Double) As Double
    floor = Int(xx)
@@ -1414,6 +1412,7 @@ EndOfMasterFunctionsVB6
    } elsif (fwipt_lang_is(LANG_VBDOTNET)) {
       $master_sub = "Public Shared Function";
       $master_functions = <<EndOfMasterFunctionsVBDOTNET;
+Private Declare Function timeGetTime Lib "winmm.dll" () As Long
 $master_sub timee() As Double
    timee = (Now() - \#1/1/1970\#).TotalSeconds * 86400.0
 End Function
@@ -1476,12 +1475,6 @@ EndOfMasterFunctionsC
 #endif $lv_cm0 ifdef __GNUC__
 EndOfMasterFunctionsH
       $master_proto = <<EndOfMasterProtoH;
-#include <stdbool.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <math.h>
-#include <time.h>
-#include <sys/time.h>
 double timee(void);
 EndOfMasterProtoH
    } elsif (fwipt_lang_is(LANG_BC)) {

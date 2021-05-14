@@ -1,5 +1,6 @@
 #! /usr/bin/perl -W
-#    Copyright (C) 2016-2020 by Kevin D. Woerner
+#    Copyright (C) 2016-2021 by Kevin D. Woerner
+# 2021-03-07 kdw  updated
 # 2020-08-17 kdw  macro syntax changed
 # 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-05-13 kdw  lang comment trivially changed
@@ -84,7 +85,8 @@ for (my $ii = 0 ; $ii <= $#ARGV ; $ii++) {
 
 my %words = ();
 my %consts = ();
-my %funcs = ();
+my %funcs_use = ();
+my %funcs_def = ();
 my %fwip_funcs = ();
 my %fwip = ();
 my %fwip_p = ();
@@ -130,9 +132,9 @@ while (my $ln = <>) {
    }
    if (s/\s*(#.*)//) {
       my $hj = $1;
-      if ($hj =~ m/#   [#I]+I+Insert-Begin (\S+) /) {
+      if ($hj =~ m/# +I+Insert-Begin -+ (\S+) /) {
          $current_filename = $1;
-      } elsif ($hj =~ m/#   [#I]+I+Insert-End (\S+) /) {
+      } elsif ($hj =~ m/# +I+Insert-End -+ (\S+) /) {
          $current_filename = $orig_filename;
       }
    }
@@ -205,7 +207,7 @@ while (my $ln = <>) {
       $fwip{$aa[0]}++;
       addd($aa[1], $current_filename);
       addd($aa[3], $current_filename);
-      $funcs{$aa[3]}++;
+      $funcs_def{$aa[3]}++;
    }
    while (s/(\bIMPORT)\b.*//) {
       addd($1, $current_filename);
@@ -220,7 +222,7 @@ while (my $ln = <>) {
       if ($ww =~ m/\b[A-Z_0-9]+\(/) {
          $fwip_funcs{$ww} += 1;
       } elsif ($ww =~ m/[a-z_A-Z0-9]\(/) {
-         $funcs{$ww} += 1;
+         $funcs_use{$ww} += 1;
       } elsif ($ww =~ m/\b(IX)_[A-Z_0-9]+\b/) {
          $indeck{$ww} += 1;
       } elsif ($ww =~ m/\b[a-z_]\w+\[/) {
@@ -233,7 +235,7 @@ while (my $ln = <>) {
    }
 }
 
-sub pp($$$ )
+sub pp($$$;$ )
 {
    if (defined($_[0])) {
       my $tt = "";
@@ -245,9 +247,12 @@ sub pp($$$ )
 
       #my $ss = $files{$_[1]};
       $tt =~ s/^ +//;
-      $tt =~ s/\.fwip//g;
+      #$tt =~ s/\.fwip//g;
+      if (defined($_[3])) {
+         $tt =~ s/\B .*//;
+      }
       $tt = join(" ", sort split(/ /, $tt));
-      printf("%8d %8d %-15s %-25s $tt\n"
+      printf("%5d %5d %-15s %-25s $tt\n"
             , $words{$_[1]}, $_[0], $_[2], $_[1]);
       $_[0];
    } else {
@@ -273,7 +278,8 @@ foreach (keys %consts) {
 foreach (map { $_->[0]; } sort { $a->[1] cmp $b->[1] }
          map { [ $_, get_key($_) ] } keys %words) {
    if (0 == pp($consts{$_}   , $_, "CONSTANT")
-         + pp($funcs{$_}     , $_, "FUNCTION")
+         + pp($funcs_def{$_} , $_, "FUNCTION-DEF", 1)
+         + pp($funcs_use{$_} , $_, "FUNCTION-USE")
          + pp($fwip_funcs{$_}, $_, "FWIP-FUNCTION")
          + pp($langs{$_}     , $_, "FWIP-LANGUAGE")
          + pp($fwip{$_}      , $_, "FWIP")

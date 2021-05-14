@@ -1,6 +1,7 @@
 #! /usr/bin/perl -W
-#    Copyright (C) 2017-2020 by Kevin D. Woerner
+#    Copyright (C) 2017-2021 by Kevin D. Woerner
 # take the output of fwip-parse, and 'nicely' format it
+# 2021-05-14 kdw  comment mistakenly changed
 # 2020-08-17 kdw  macro syntax changed
 # 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-07-09 kdw  mode-extended rmd
@@ -24,7 +25,7 @@
 # 2019-09-10 kdw  LA[N]GUAGE NOT to LA[N]GUAGE_NOT
 # 2019-08-15 kdw  CON[S]TANT -> CON[S]T keyword change
 # 2019-08-12 kdw  fwip wrap func arg change
-# 2019-08-05 kdw  var renam; fwip-wrap lib
+# 2019-08-05 kdw  var renam; fwipwrap lib
 # 2019-07-22 kdw  FU[N]C regex cleanup
 # 2019-07-12 kdw  K[W]_D[I]R_.* env vars
 # 2019-06-12 kdw  rmed var n[u]l_to

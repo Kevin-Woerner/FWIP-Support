@@ -1,5 +1,14 @@
 #! /usr/bin/perl -W
-#    Copyright (C) 2016-2020 by Kevin D. Woerner
+#    Copyright (C) 2016-2021 by Kevin D. Woerner
+# 2021-03-09 kdw  cx work
+# 2021-03-05 kdw  fwip syntax debugging
+# 2021-02-26 kdw  added pepper
+# 2021-02-24 kdw  output alignment changed
+# 2021-02-22 kdw  backslash work
+# 2021-02-20 kdw  output change
+# 2021-02-15 kdw  string const
+# 2021-02-08 kdw  output format changed
+# 2021-02-01 kdw  seen_[cf] hashes
 # 2020-11-22 kdw  uniqified output
 # 2020-06-25 kdw  -J option
 # 2020-06-01 kdw  output format changed
@@ -86,6 +95,29 @@ if ($code_flag and $zero_flag) {
    usage("Options -c and -0 are mutually exclusive");
 }
 
+sub pepper($$$ )
+{
+   my ($nam, $val, $unt) = @_;
+   my $sval;
+
+   if ($val =~ m/["a-df-zA-DF-Z]/) {
+      $sval = $val;
+   } else {
+      if ($val =~ m/\^/) {
+         die "VAL=$val in def of $nam"
+      }
+      if ($val <= 0.0 and 0.0 <= $val) {
+         $sval = "+0";
+      } elsif (abs($val) < 0.01 or 1E11 < abs($val)) {
+         $sval = sprintf("%+-22.14E", $val);
+         $sval =~ s/\B0+E/E/;
+      } else {
+         $sval = sprintf("%+.16G", $val);
+      }
+   }
+   sprintf("%-29s %-22s # %s", $nam, $sval, $unt);
+}
+
 my @fwip_files = ();
 
 for (my $ii = 0 ; $ii <= $#ARGV; $ii++) {
@@ -113,10 +145,13 @@ if ($#fwip_files < 0) {
 }
 
 my @outz = ();
-my %seen = ();
+my %seen_c = ();
+my %seen_f = ();
 my $pref = "";
 my $fname;
 my @const_arr = ();
+my @constr_arr = ();
+my @conval_arr = ();
 my $argq;
 foreach $argq (@fwip_files) {
    open(FH, "< $argq") or die "Unable to open $argq";
@@ -129,43 +164,53 @@ foreach $argq (@fwip_files) {
          push(@file_arr, $1);
       } elsif (m/ I+Insert-End.* (\w+.?\w*) /) {
          pop(@file_arr);
-      } elsif ($cons_flag and s/^ *CONST +(\S+).*/$1/) {
-         if (m/($pattern)/) {
-            chomp;
-            push(@const_arr, $_);
-         }
-      } elsif ($func_flag and m/^(\s*)FUNC +\S+ +(\w+)/) {
-         ($pref, $fname) = ($1, $2);
-         my $fdef = $_;
-         while (!eof(FH) and $fdef !~ m/:/) {
-            $fdef .= <FH>;
-            $fdef =~ s/ +\\\n +,/,/;
-         }
-         if (!$j_flag) {
-            $fdef =~ s/\n +,/,/g;
-         }
-         if (!$zero_flag or $fdef !~ m/:/) {
-            while (!eof(FH)) {
-               my $new = <FH>;
-               if ($code_flag) {
-                  if ($new =~ m/\bFUNC_END\b/) {
-                     $fdef .= $new;
-                     last;
-                  }
-               } elsif ($new !~ m/^\s*#/) {
-                  last;
+      } else {
+         if ($cons_flag and s/^ *CONST +(\S+)\s+(.*)/$1/) {
+            my $hh = $2;
+            if (m/($pattern)/) {
+               chomp;
+               if ($hh =~ m/\"/) {
+                  s/\\([tvnb])/\\\\$1/g;
+                  push(@constr_arr, $_);
+               } else {
+                  push(@const_arr, $_);
                }
-               $fdef .= $new;
+            }
+         }
+         if ($func_flag and m/^(\s*)FUNC +\S+ +(\w+)/) {
+            ($pref, $fname) = ($1, $2);
+            my $fdef = $_;
+            $fdef =~ s/^\s*FUNC //;
+            while (!eof(FH) and $fdef !~ m/:/) {
+               $fdef .= <FH>;
                $fdef =~ s/ +\\\n +,/,/;
             }
-         }
-         $fdef =~ s/^$pref//gm;
-         if ($fdef =~ m/($pattern)/) {
-            if ($h_flag) {
-               $fdef =~ s/^/$file_arr[$#file_arr]:/gm;
+            if (!$j_flag) {
+               $fdef =~ s/\n +,/,/g;
             }
-            push(@outz, $fdef);
-            $seen{$fname} .= $fdef;
+            if (!$zero_flag or $fdef !~ m/:/) {
+               while (!eof(FH)) {
+                  my $new = <FH>;
+                  if ($code_flag) {
+                     if ($new =~ m/\bFUNC_END\b/) {
+                        $fdef .= $new;
+                        last;
+                     }
+                  } elsif ($new !~ m/^\s*#/) {
+                     last;
+                  }
+                  $fdef .= $new;
+                  $fdef =~ s/ +\\\n +,/,/;
+               }
+            }
+            $fdef =~ s/^$pref//gm;
+            if ($fdef =~ m/($pattern)/) {
+               if ($h_flag) {
+                  $fdef =~ s/^/$file_arr[$#file_arr]:/gm;
+               }
+               push(@outz, $fdef);
+               $seen_f{$fname} .= $fdef;
+            }
          }
       }
    }
@@ -178,35 +223,63 @@ if (0 <= $#const_arr) {
          , map { s/fwipp/units/;$_ } @fwip_files);
    my @reply = map {
       chomp;
-      s/.*= //;
+      s/.*= +//;
+      s/^ +//;
       s/(0+)(0E[+-]\d+)/$2/;
       s/([1-9])0E/${1}E/;
       if (!m/ /) {
          $_ .= " 1";
       }
       $_;
-   } qx{echo "$cmd" | units -t $fls -o%+22.15E};
+   } qx{echo "$cmd" | units -t $fls -o%+22.14E};
 
    foreach my $ff (0..$#const_arr) {
       my $rr = $reply[$ff];
       my $cc = $const_arr[$ff];
-      my $yy = sprintf("CONST %-23s %-22s ; # %s\n"
-            , $cc, split(/ +/, $rr, 2));
-      if (defined($seen{$cc})) {
-         if ($seen{$cc} ne $yy) {
-            die "$seen{$cc} ne $yy";
+      if ($rr !~ m/\b +/) {
+         $rr .= " 1";
+      }
+      my @aa = split(/\b +/, $rr, 2);
+      my $yy = pepper($cc, $aa[0], $aa[1]) . "\n";
+      if (defined($seen_c{$cc})) {
+         if ($seen_c{$cc} ne $yy) {
+            die "$seen_c{$cc} ne $yy";
          }
       } else {
-         $seen{$cc} = $yy;
-         push(@outz, $seen{$cc});
+         $seen_c{$cc} = $yy;
+         push(@outz, $seen_c{$cc});
       }
+   }
+}
+if (0 <= $#constr_arr) {
+   my $rr = "print(" . join(")\nprint(", @constr_arr) . ")";
+   my @vv = qx{ echo -n "
+from Kw import *;
+from Kwelements import *;
+from Kwplanets import *;
+from Kwsun import *;
+from Tm_Const import *;
+$rr" | python3};
+   foreach my $ii (0..$#constr_arr) {
+      my $cc = $constr_arr[$ii];
+      chomp($vv[$ii]);
+      $vv[$ii] =~ s/\t/\\t/g;
+      $vv[$ii] =~ s/\n/\\n/g;
+      $vv[$ii] =~ s/\v/\\v/g;
+      $seen_c{$cc} = sprintf("%-29s \"%s\"\n", $cc, $vv[$ii]);
+      push(@outz, $seen_c{$cc});
    }
 }
 
 if ($sort_flag) {
-   foreach my $fd (sort keys %seen) {
-      $seen{$fd} =~ s/\s*\\\n\s*//g;
-      print "$seen{$fd}";
+   foreach my $fd (sort keys %seen_f) {
+      $seen_f{$fd} =~ s/\s*\\\n\s*//g;
+      print "$seen_f{$fd}";
+   }
+   foreach my $fd (sort { substr($a, 52) cmp substr($b, 52)
+               or substr($a, 30, 22) <=> substr($b, 30, 22)
+            } map { $seen_c{$_}; } keys %seen_c) {
+      print "$fd";
    }
 } else {
    print join("", @outz);

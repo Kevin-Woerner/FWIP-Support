@@ -1,5 +1,8 @@
 #! /bin/bash
-#    Copyright (C) 2019-2020 by Kevin D. Woerner
+#    Copyright (C) 2019-2021 by Kevin D. Woerner
+# 2021-03-09 kdw  cx work
+# 2021-03-05 kdw  -r command line option
+# 2021-02-03 kdw  debugging
 # 2020-11-30 kdw  osdep comment change
 # 2020-11-27 kdw  no net change
 # 2020-06-30 kdw  BC: change resolution
@@ -32,6 +35,7 @@ gg_flag=0
 bc_flag=0
 vb_flag=0
 rpn_flag=0
+ratio_flag=0
 declare -a file_arr
 declare -a arg_arr
 if [ -n "$1" ] ; then
@@ -49,6 +53,7 @@ if [ -n "$1" ] ; then
                -gendat* )  gg_flag+=1 ; arg="-${arg:6}" ;;
                -bc*     )  bc_flag+=1 ; arg="-${arg:3}" ;;
                -rpn*    ) rpn_flag+=1 ; arg="-${arg:4}" ;;
+               -r*      ) ratio_flag+=1 ; arg="-${arg:2}" ;;
                -v* ) verbose_flag+=1; set -x; arg="-${arg:2}" ;;
                -* ) cat <<EOF
 $0:Bad Arg $arg
@@ -156,11 +161,16 @@ print \"BCC      $func_str $ee = \", $ee, \"\\n\";
 if [ ${#arg_arr[@]} -le 0 ] ; then
    if [[ 0 -eq ${#file_arr[@]} ]] ; then
       # read from stdin if no input so far
+      echo "READING STDIN:"
       silly=$(cat | perl -pe "s/ +//g;s/;/\n/g;")
+   elif [[ 0 -lt $ratio_flag ]] ; then
+      silly=$(grep -E "#TEST:" "${file_arr[@]}" |
+            perl -pe "s/[; ]+//g;s/.*#TEST://;
+               s@(.*)==(.*)@(\$1)/(\$2)-1@;")
    else
       silly=$(grep -E "#TEST:" "${file_arr[@]}" |
             perl -pe "s/[; ]+//g;s/.*#TEST://;
-               s@(.*)==(.*)@(\$1)/(\$2)-1\n(\$1)-(\$2)@;")
+               s@(.*)==(.*)@(\$1)-(\$2)@;")
    fi
 else
    silly=${arg_arr[@]}
@@ -185,6 +195,7 @@ if [ -n "$strc" ] ; then
 #include "Kwsun.h"
 #include "Kwplanets.h"
 #include "Kwelements.h"
+#include "Tm_Const.h"
 int main(void)
 {
 EOF
@@ -195,6 +206,7 @@ EOF
 " >> "$temp_file.c"
    verbose_print C "$(cat "$temp_file.c")"
    gc "$temp_file.c" -o"$temp_file.c.exe" \
+      "$KW_DIR_LIB/libTm_Const.a" \
       "$KW_DIR_LIB/libKwsun.a" \
       "$KW_DIR_LIB/libKwplanets.a" \
       "$KW_DIR_LIB/libKwelements.a" \
@@ -227,6 +239,7 @@ from Kw import *
 from Kwsun import *
 from Kwplanets import *
 from Kwelements import *
+from Tm_Const import *
 EOF
 )
 $strpy" ) > $temp_file.python.out &
@@ -238,10 +251,11 @@ if [ -n "$strpl" ] ; then
 #! /usr/bin/perl -W
 use strict;
 use lib "\$ENV{KW_DIR_INCLUDE}";
-use Kw qw( :ALL );
-use Kwsun qw( :ALL );
-use Kwplanets qw( :ALL );
+use Kw         qw( :ALL );
+use Kwsun      qw( :ALL );
+use Kwplanets  qw( :ALL );
 use Kwelements qw( :ALL );
+use Tm_Const   qw( :ALL );
 EOF
 )
 $strpl" ) > $temp_file.perl.out &

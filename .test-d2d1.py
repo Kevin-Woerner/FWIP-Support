@@ -1,5 +1,6 @@
 #! /usr/bin/python3
-#    Copyright (C) 2020 by Kevin D. Woerner
+#    Copyright (C) 2020-2021 by Kevin D. Woerner
+# 2021-03-07 kdw  outut change
 # 2020-04-08 kdw  created
 import Kw
 
@@ -10,7 +11,7 @@ def fifi(f1, f2):
       print(" {:3d}".format(ii), end='')
       pt = [0,0]
       f1(ii, pt)
-      print(" ({:3.0f},{:3.0f})".format(pt[0], pt[1]), end='')
+      print(" ({:3.0f},{:3.0f} )".format(pt[0], pt[1]), end='')
       jj = f2(pt[0], pt[1])
       print(" {:3d} {:3d}".format(jj, jj - ii))
 

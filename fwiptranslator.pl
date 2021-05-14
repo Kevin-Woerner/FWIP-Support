@@ -1,6 +1,23 @@
 #! /usr/bin/perl -W
-#    Copyright (C) 2015-2020 by Kevin D. Woerner
+#    Copyright (C) 2015-2021 by Kevin D. Woerner
 # FWIP (Functions Written In Pseudocode) Processor
+# 2021-05-02 kdw  VB6: print[a-z]+ -> debug.print
+# 2021-04-27 kdw  VB: allows <= 12 line continuations
+# 2021-04-23 kdw  macro renam
+# 2021-04-14 kdw  indent for line break
+# 2021-04-13 kdw  RPN: f_rpn_c_ enum added
+# 2021-04-07 kdw  RPN: output formatting
+# 2021-04-03 kdw  VB: more work
+# 2021-04-02 kdw  VB: func return work
+# 2021-03-18 kdw  BC:expanded def of consts
+# 2021-03-16 kdw  const name changed
+# 2021-03-15 kdw  C,H,RPN: const work (failed)
+# 2021-03-11 kdw  C,H,RPN: failed block def work
+# 2021-03-09 kdw  cx work
+# 2021-02-22 kdw  backslash work
+# 2021-02-19 kdw  master func work
+# 2021-02-15 kdw  string work
+# 2021-02-13 kdw  experiment
 # 2020-09-08 kdw  VBDOTNET: "private dim" to "private shared"
 # 2020-08-29 kdw  _a[r]r changed to _mt[r]x
 # 2020-08-25 kdw  var renam
@@ -486,21 +503,21 @@ sub funcyaddcnx($$ )
    my $name = $_[0];
    $funcy_bcrx .= "|$name";
 
-   my $cxnamel = "cx" . lc($name);
+   my $cxnamel = "cx" . ($name);
    if ($_[1] !~ m/BLOCK_CONST/) {
       if (Fwip_Translate::fwipt_lang_is(LANG_BC)) {
          funcyadd($cxnamel, -1);
+         funcyadd($cxnamel, 0);
       } else {
          funcyadd($name, -1);
       }
-      funcyadd($cxnamel, 0);
    }
    $cxnamel;
 }
 
 my @context = ();
 my $verbose_flag = 0;
-my $package_name;
+my $packagename;
 sub usage($ )
 {
    die <<EndOfUsage;
@@ -512,7 +529,6 @@ Options:
    Languages:
       --pm      --perl
       --py      --python
-      --f       --fwipp      --fwip
       --bas     --vb6
       --vb      --vbdotnet
       --u       --units
@@ -525,7 +541,7 @@ EndOfUsage
 }
 my $command_line_args = $ARGV[0]; # join(" ", @ARGV);
 if (!Getopt::Long::GetOptions("l+", \$target_language
-      , "n=s", \$package_name
+      , "n=s", \$packagename
       , "V+", \$verbose_flag
       , "vb6|bas",      sub { $target_language = LANG_VB6; }
       , "vb|vbdotnet",  sub { $target_language = LANG_VBDOTNET; }
@@ -547,23 +563,24 @@ my ($cmout0, $cmout4, $bq, $bql)
 my $lang_name = (qw(LANG_NONE LANG_PYTHON LANG_VB6 LANG_C
       LANG_BC LANG_PERL LANG_C LANG_C LANG_VARYLOG LANG_UNITS
       LANG_VBDOTNET))[Fwip_Translate::fwipt_lang_get()];
-my $master_flag = 0;
+my $import_master_flag = 0;
 my @vbglobal_vars = ();
 my %bc_2darrdim = ();
+my @c_def = ();
+my @include_files = ();
 my @func_prototype = ();
 my @cx_func_proto = ();
-if (!defined($package_name)) {
-   usage "package_name not defined";
+if (!defined($packagename)) {
+   usage "packagename not defined";
 }
 
-$package_name =~ s@.*/@@;
-$package_name =~ s@\..*@@;
-$package_name =~ s/-/_/g;
-my $lcpn = lc($package_name);
+$packagename =~ s@.*/@@;
+$packagename =~ s@\..*@@;
+$packagename =~ s/-/_/g;
+my $lcpn = lc($packagename);
 
 if (Fwip_Translate::fwipt_lang_is(LANG_C, LANG_H, LANG_RPN)) {
-   push(@func_prototype
-         , "void ${lcpn}_description(void);");
+   push(@func_prototype, "void ${lcpn}_description(void);");
 }
 
 funcyadd("timee", 0);
@@ -574,8 +591,7 @@ if (Fwip_Translate::fwipt_lang_is(LANG_RPN)) {
 foreach (qw(abs sin cos tan log exp sqrt floor ceil)) {
    funcyadd($_, 1);
    if (Fwip_Translate::fwipt_lang_is(LANG_RPN)) {
-      push(@func_prototype
-            , "double $_(double);");
+      push(@func_prototype, "double $_(double);");
    }
 }
 if (Fwip_Translate::fwipt_lang_is(LANG_PERL)) {
@@ -585,8 +601,7 @@ if (Fwip_Translate::fwipt_lang_is(LANG_PERL)) {
 foreach (qw(pow atan2 fmod)) {
    funcyadd($_, 2);
    if (Fwip_Translate::fwipt_lang_is(LANG_RPN)) {
-      push(@func_prototype
-            , "double $_(double, double);");
+      push(@func_prototype, "double $_(double, double);");
    }
 }
 
@@ -597,11 +612,10 @@ my @cx_funs = ();
 
 my @input_lines = ();
 my @fh = ();
-my $cmfwip4 = Fwip_Comment::FWIPC_CM4;
-my $cmfwip0 = Fwip_Comment::FWIPC_CM0;
+my $lv_cm4 = Fwip_Comment::FWIPC_CM4;
+my $lv_cm0 = Fwip_Comment::FWIPC_CM0;
 my %local_const_hash = ();
 
-#push(@input_lines, Fwip_Comment::fwipc_comm("x", "y");
 my $comment_block = 0;
 my $good_current_language = 1;
 
@@ -611,40 +625,41 @@ my $frgx = "(?:[+-]?(?:[0-9_]+\\.?[0-9_]*|[0-9_]*\\.?[0-9_]+)"
 # Read in FWIP program to @input_lines
 # join all continuation lines
 # splice out all language lines
-while (my $ln = <>) {
-   chomp($ln);
-   chomp($ln);
-   $ln =~ s/^\s+//;
-   if ($ln =~ s/\\$// # CNTNTNLN
-         or ($ln =~ m/^[^#]+$/
-            and $ln !~ m/([;:]|\B_END\b)/)) {
+while (my $lin = <>) {
+   chomp($lin);
+   chomp($lin);
+   $lin =~ s/^\s+//;
+   if ($lin =~ s/\\$// # continuation line
+            or ($lin =~ m/^[^#]+$/ and $lin !~ m/([;:]|\B_END\b)/)) {
       my $xn = <>;         # continuation line
       if (!defined($xn)) {
-         die "whoopsiedoodle:$ARGV:$ln";
+         die "whoopsiedoodle:$ARGV:$lin";
       }
       chomp($xn);
       $xn =~ s/^\s+//;     # continuation line
-      $ln =~ s/\s*$/ /;    # continuation line
-      $ln .= $xn;          # continuation line
-      $ln =~ s/ +,/,/g;    # continuation line
+      $lin =~ s/\s*$/ /;    # continuation line
+      $lin .= $xn;          # continuation line
+      $lin =~ s/ +,/,/g;    # continuation line
       if (!eof()) {        # continuation line
          redo;             # continuation line
       }                    # continuation line
    }                       # continuation line
 
    # parenthesize return values
-   $ln =~ s/RETURN ([^;]+?);/RETURN ($1);/g;
+   $lin =~ s/RETURN ([^;]+?);/RETURN ($1);/g;
 
-   if ($ln =~ m/[0-9]e[-+]?[0-9]/) {
-      die "lower case e in numbers not allowed:$ln\n";
+   if ($lin =~ m/[0-9]e[-+]?[0-9]/) {
+      die "lower case e in numbers not allowed:$lin\n";
    }
+   $lin =~ s/([0-9]E[+-])0+\B/$1/g;
+   $lin =~ s/([0-9])E\+0+\b/$1/g;
 
-   $ln =~ s/(?<=[a-z0-9]) +,/,/g;
-   $ln =~ s/\( *\+ */(/g;
-   $ln =~ s/, *\+ */, /g;
-   $ln =~ s/^\s+//mg;
-#   $ln =~ s/\b$package_name\.//g;
-   if ($ln =~ s/\b(LANGUAGE(_NOT)?)\s+(.*?)://) {
+   $lin =~ s/(?<=[a-z0-9]) +,/,/g;
+   $lin =~ s/\( *\+ */(/g;
+   $lin =~ s/, *\+ */, /g;
+   $lin =~ s/^\s+//mg;
+#   $lin =~ s/\b$packagename\.//g;
+   if ($lin =~ s/\b(LANGUAGE(_NOT)?)\s+(.*?)://) {
       my ($noty, $langg) = ($1, $3);
       $langg =~ s/\s*#.*//;
       my @lngs = grep { m/./ } split(/\s+/, $langg);
@@ -662,29 +677,30 @@ while (my $ln = <>) {
       } elsif ($not_count == 1) {
          $good_current_language = 1 - $good_current_language;
       }
-   } elsif ($ln =~ s/LANGUAGE_END\b//) {
+   } elsif ($lin =~ s/LANGUAGE_END\b//) {
       $good_current_language = 1;
    } elsif ($good_current_language) {
-      if ($ln =~ s/^\b(IMPORT_MASTER)\b//) {
-         push(@input_lines, Fwip_Comment::fwipc_comm("$1", "A"));
-         $master_flag = 1;
-      } elsif ($ln =~ m/^($cmfwip0 \d{4}(-\d\d){2} kdw  )(.*)/) {
+      if ($lin =~ s/^\b(IMPORT_MASTER)\b//) {
+         push(@input_lines, Fwip_Comment::fwipc_comm($1, $1));
+         $import_master_flag = 1;
+      } elsif ($lin =~ m/^($lv_cm0 \d{4}-\d\d-\d\d kdw  )(.*)/) {
          if (Fwip_Translate::fwipt_lang_is(LANG_VARYLOG)) {
-            push(@varylog_block, "$1:$3");
+            push(@varylog_block, "$1:$2");
          }
       } else {
-         $ln =~ s/^\s+//;
+         $lin =~ s/^\s+//;
          my @aa = map { s/^\s+//;$_; }
                   grep { m/\S/ }
-                  split(/\n/, $ln);
+                  split(/\n/, $lin);
          push(@input_lines, @aa);
       }
    }
 }
 
-if (!$master_flag) {
+if (!$import_master_flag) {
    @funcy_args = ();
    %funcy_names = ();
+   @c_def = ();
    @func_prototype = ();
    @cx_func_proto = ();
 }
@@ -730,7 +746,7 @@ foreach (@input_lines) {
    # Firstly, remove comments
    if (Fwip_Translate::fwipt_lang_is(LANG_VB6)
             or Fwip_Translate::fwipt_lang_is(LANG_VBDOTNET)) {
-      s/\bDAY\b/EARTHSOLARDAY/g;
+      s/\bDAY\b/EARTH_SOLARDAY/g;
    }
 
    # RM spaces between a function name and "("
@@ -755,17 +771,32 @@ foreach (@input_lines) {
       }
       $st;
    }
-   if (s/\s*((?<!\\)$cmfwip0.*)//) {  # remove comments
+   sub lf_quincy($$ )
+   {
+      my ($name, $valu) = @_;
+      my $ret;
+
+      if ($name =~ m/_CNT$/ or $valu =~ m/\bsqrt\(/i) {
+         $ret = "#define $name ($valu)";
+      } elsif ($name =~ m/^LC_/) {
+         $ret = "static const int $name = ($valu);";
+      } else {
+         $ret = "#define $name ($valu)";
+         #$ret = "const double $name = ($valu);";
+      }
+      $ret;
+   }
+
+   if (s/\s*((?<!\\)$lv_cm0.*)//) {  # remove comments
       $comment_curr = $1;
 
       if (m/\S/) {
          $comment_curr =~ s/^ +/${bq}/;
       }
-      if ($comment_curr =~ s/^$cmfwip4/$cmout4/) {
+      if ($comment_curr =~ s/^$lv_cm4/$cmout4/) {
       } else {
-         $comment_curr =~ s/$cmfwip0/$cmout0/;
-         if (Fwip_Comment::FWIPC_LINE_LENGTH
-                     < length($comment_curr)) {
+         $comment_curr =~ s/$lv_cm0/$cmout0/;
+         if (Fwip_Comment::FWIPC_LINE_LENGTH < length($comment_curr)) {
             if (1 < length($cmout0)) {
                my $bb = " " x (length($cmout0));
                if ($comment_curr =~ s/$bb/ /) {
@@ -779,8 +810,7 @@ foreach (@input_lines) {
    $comment_curr = ""; # 20200618 kdw  added
    if (m/^$/) {
       if (Fwip_Translate::fwipt_lang_aint(LANG_H, LANG_RPN)) {
-         push(@outa, Fwip_Translate::fwipt_ls_get()
-                  . "$comment_curr");
+         push(@outa, Fwip_Translate::fwipt_ls_get() . "$comment_curr");
       }
       next;
    }
@@ -809,8 +839,7 @@ foreach (@input_lines) {
    }
 
    if (m/$rxp_fd/s) {
-      my ($retv, $func, $args, $rest)
-            = ($1, $2, $3, $4);
+      my ($retv, $func, $args, $rest) = ($1, $2, $3, $4);
 
       Fwip_Translate::fwipt_current_function_set($func, $retv);
 
@@ -820,7 +849,7 @@ foreach (@input_lines) {
                = Fwip_Translate::fwipt_master_functions();
          my @ms_fun = ();
 
-         if ($master_flag) {
+         if ($import_master_flag) {
             foreach my $subb (split(/\n/, $master_functions)) {
                if ($subb =~ m/^$master_sub\s+([a-z_0-9]+)\(/) {
                   push(@ms_fun, Fwip_Comment::fwipc_comm(
@@ -836,15 +865,15 @@ foreach (@input_lines) {
             # BC needs the master functions to calculate some
             # of the constants (e.g. cxe = exp(1.0))
             push(@outa, @ms_fun, @cx_funs);
-         } elsif (Fwip_Translate::fwipt_lang_is(LANG_H
-                  , LANG_RPN)) {
+         } elsif (Fwip_Translate::fwipt_lang_is(LANG_VB6, LANG_VBDOTNET)) {
+            push(@outa, @ms_fun, @cx_funs);
+         } elsif (Fwip_Translate::fwipt_lang_is(LANG_H, LANG_RPN)) {
             unshift(@func_prototype, split(/\n/, $master_proto));
          } else {
             push(@outa, @cx_funs, @ms_fun);
             if (Fwip_Translate::fwipt_lang_is(LANG_PERL)
-                     && $master_flag) {
-               unshift(@func_prototype
-                     , (split(/\n/, $master_proto)));
+                        && $import_master_flag) {
+               unshift(@func_prototype, (split(/\n/, $master_proto)));
             }
          }
       }
@@ -885,7 +914,7 @@ foreach (@input_lines) {
       $array_size{$1} = $2 - 1;
    }
    if (Fwip_Translate::fwipt_lang_is(LANG_UNITS)) {
-      # UNITS --- ----- ----- ----- ----- ----- ----- ----- -----
+      # UNITS --- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       s/$rxp_mn//g;
 
       if (s/\bCONST\s+(\w+)\b\s*(\S.*?);//s) {
@@ -893,16 +922,20 @@ foreach (@input_lines) {
          $valu =~ s/\b(SQRT|EXP)\b/\L$1/g;
          $valu =~ s/\bLN\b\s*\(/ln(/g;
          $valu =~ s%\bATAN2\s*\((.*?),(.*?)\)%atan(($1)/($2))%g;
-         $_ = "";
-         if ($valu eq "1.0") {
-            $valu = lc($name);
+#         if ($valu eq "1.0") {
+#            $valu = lc($name);
+#         }
+         if ($valu !~ m/\s*\".*\"\s*/) {
+            $valu =~ s/\" \"//g;
+            $_ = lf_cmadd("$name $valu");
+         } else {
+            $_ = "";
          }
-         $_ .= lf_cmadd(sprintf("%s %s", $name, $valu));
       } else {
          $_ = "";
       }
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_PERL)) {
-      # PERL ---- ----- ----- ----- ----- ----- ----- ----- -----
+      # PERL ---- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       if (s/ARRAY\s*(\w+)\[\s*\]\s*://) {
          $array_name = $1;
          $array_index = 0;
@@ -920,26 +953,23 @@ foreach (@input_lines) {
       }
 
       s/(?<!")($rxp_an)/\$$1/g; # sigils
-      s/(?<!")($rxp_vn)/\$$1/g; # sigils
+      s/(?<!["\\])($rxp_vn)/\$$1/g; # sigils
       s/((?:BLOCK_DEF\s+)?CONST)\s+\$($rxp_vn)/$1 $2 /g;
       s/[\$\@]+([\$\@])(\w)/$1$2/g;  # rm duplicate sigils
       s/\$+($rxp_fn)/$1/g; # rm func sigils
 
-      # PERL ---- ----- ----- ----- ----- ----- ----- ----- -----
+      # PERL ---- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
          my ($what, $name, $valu) = ($1, $2, $3);
          $name =~ s/^\$//;
          my $cxnamel = funcyaddcnx($name, $what);
-         push(@cx_funs
-               , lf_cmadd(sprintf("sub %s { $name }"
-                     , "$cxnamel()"), 1));
-         $_ = lf_cmadd(sprintf("sub %s { $valu; }"
-         , "$name()"));
+         #push(@cx_funs, lf_cmadd("sub $cxnamel() { $name }", 1));
+         $valu =~ s/\"\s+\"/" . "/g;
+         $_ = lf_cmadd("sub $name() { $valu; }");
       }
 
       if (m/$rxp_fd/) {
-         my ($ret, $func, $args, $rest)
-               = ($1, $2, $3, $4);
+         my ($ret, $func, $args, $rest) = ($1, $2, $3, $4);
 
          Fwip_Translate::fwipt_ls_inc($_);
 
@@ -973,8 +1003,8 @@ foreach (@input_lines) {
                $hg[0] =~ s/,\s+,/,/g;
                $hg[1] =~ s/,$//g;
                $deff .= sprintf("\n"
-                  . "${bq}if (!defined(%-7s)) { %-7s = $hg[1]; }"
-                  , $hg[0], $hg[0]);
+                        . "${bq}if (!defined(%-7s)) { %-7s = $hg[1]; }"
+                        , $hg[0], $hg[0]);
             }
          }
          $argy =~ s/\s+,/,/g;
@@ -1006,7 +1036,7 @@ foreach (@input_lines) {
       print STDERR "$_\n" if (m/\bmy\b.*\[/);
       die $_ if (m/my \$.*\[/);
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_PYTHON)) {
-      # PYTHON -- ----- ----- ----- ----- ----- ----- ----- -----
+      # PYTHON -- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       s/$rxp_vd\s+(\w+)\[\s*\];/$1 = []/;
 
       if (s/ARRAY\s*(\w+)\[\s*\]\s*://) {
@@ -1039,20 +1069,18 @@ foreach (@input_lines) {
       }
       s/^\bIMPORT\s*\"(.*?)\"\s*;/import $1\n/;
 #      s/^\bIMPORT\s*\"(.*?)\"\s*;/from $1 import *\n/;
-      # PYTHON -- ----- ----- ----- ----- ----- ----- ----- -----
+      # PYTHON -- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
          my ($what, $name, $valu) = ($1, $2, $3);
          my $cxnamel = funcyaddcnx($name, $what);
-         push(@cx_funs
-               , lf_cmadd(sprintf("%s = ($name)"
-                     , $cxnamel), 1));
-         $_ = lf_cmadd(sprintf("%s = $valu", $name));
+         #push(@cx_funs, lf_cmadd("$cxnamel = ($name)", 1));
+         $valu =~ s/\"\s+\"/" + "/g;
+         $_ = lf_cmadd("$name = $valu");
       }
 
       if (m/\bRETURN\b\s*(.*?);/ and "INT" eq
             Fwip_Translate::fwipt_current_function_ret_get()) {
-         s/\bRETURN\b\s*(.*?);/
-               "return int($1)"/xeg;
+         s/\bRETURN\b\s*(.*?);/"return int($1)"/xeg;
       }
 
       s/\bREDIM\s+(\S.*?)\[\s*\],\s*(\S.*);/
@@ -1061,10 +1089,9 @@ foreach (@input_lines) {
       s/^\bREDIM\s+(\S*?)\[\s*\]\s*;//;
 
       s/PRINTSTR\s*\((.*?)\);/print($1, end='')/g;
-      s/PRINTVAL\s*\((.*?)\)\s*;
-            /print(str($1), end='')/gx;
+      s/PRINTVAL\s*\((.*?)\)\s*;/print(str($1), end='')/gx;
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_VB6)) {
-      # VB6 ----- ----- ----- ----- ----- ----- ----- ----- -----
+      # VB6 ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       chomp;
       if (s/ARRAY\s*(\w+)\[\s*\]\s*://) {
          $array_name = $1;
@@ -1082,7 +1109,7 @@ foreach (@input_lines) {
          s/ARRAYLAST\((\w+)\[\s*\]\)/ $array_size{$1} /e;
       }
 
-      s/\b0x([0-9A-Fa-f]+)/\&H$1/g;
+      s/\b0x([0-9A-Fa-f]+)/\&H$1&/g;
       s/\b0o([0-7]+)/\&O$1/g;
       s/\b0b([01]+)/\&B$1/g;
       s/^\b(IMPORT\s*\"(.*?)\"\s*;)/$cmout0$1\n/;
@@ -1127,20 +1154,31 @@ foreach (@input_lines) {
             . Fwip_Translate::fwipt_vbsub_set($pref)
             . " $func($args)$qq$rest";
       }
-      # VB6 ----- ----- ----- ----- ----- ----- ----- ----- -----
-      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
+      # VB6 ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?) *;//s) {
          my ($what, $name, $valu) = ($1, $2, $3);
-         my $ty = ("Double");
-#         $_ = "";
-         my $pp = ($what =~ m/BLOCK_DEF/ ? "Private" : "Public");
-         my $cxnamel = funcyaddcnx($name, $what);
+         my $ty;
+         if ($valu !~ m/\"/) {
+            $ty = ("Double");
+         } else {
+            $valu =~ s/\"\s+\"/" & "/g;
+            $ty = ("String");
+         }
+         #         $_ = "";
+         my $pp;
+         if ($what =~ m/BLOCK_DEF/ or $name =~ m/^(LC_|LX_)/) {
+            $pp = "Private";
+         } else {
+            $pp = "Public";
+         }
          $valu =~ s/SQRT\s*\((.+)\)/($1) ^ 0.5/;
          # VB6 doesnt do self-ref modules
-         $valu =~ s/$package_name\.//g;
-         push(@cx_funs
-            , lf_cmadd("$pp Function $cxnamel() As $ty\n"
-                  . "${bq}$cxnamel = $name\n"
-                  . "End Function", 1));
+         $valu =~ s/$packagename\.//g;
+         my $cxnamel = funcyaddcnx($name, $what);
+         #push(@cx_funs
+         #   , lf_cmadd("$pp Function $cxnamel() As $ty\n"
+         #         . "${bq}$cxnamel = $name\n"
+         #         . "End Function", 1));
          $_ = lf_cmadd("$pp Const $name As $ty = $valu");
 =pod
          my $mlm = Fwip_Comment::FWIPC_LINE_LENGTH + 1;
@@ -1154,12 +1192,9 @@ foreach (@input_lines) {
 =cut
       }
 
-      if (s/(?<!\bAs)(\s*)($rxp_vd)\s+
-                  ([a-z_A-Z][a-z_0-9]*\[.*\])
+      if (s/(?<!\bAs)(\s*)($rxp_vd)\s+([a-z_A-Z][a-z_0-9]*\[.*\])
             /${1}Dim $3 As $2/xg
-         or
-            s/(?<!\bAs)(\s*)\b($rxp_vd)\s+
-                     ([a-z_A-Z][a-z_0-9]*\b)
+         or s/(?<!\bAs)(\s*)\b($rxp_vd)\s+([a-z_A-Z][a-z_0-9]*\b)
                /${1}Dim $3 As $2/xg) {
          my $var = $3;
          s/\s*(=)(.*)//;
@@ -1171,30 +1206,26 @@ foreach (@input_lines) {
       s/\b%\b/ Mod /xsmg;
       s/\(\s+/(/g;
 
-      s!(\s*)(\S+)\s*([-+/*]|\<\<|\>\>)=(.*)
-         !$1$2 = $2 $3$4!x;
+      s!(\s*)(\S+)\s*([-+/*]|\<\<|\>\>)=(.*)!$1$2 = $2 $3$4!x;
       s/ \>\>/\\ 2 ^/g;
       s/\*\*/^/g;
 
-      s/\bREDIM\s+(\S.*?)\[\s*\],\s*(\S.*);
-            /ReDim Preserve $1($2)/x;
+      s/\bREDIM\s+(\S.*?)\[\s*\],\s*(\S.*);/ReDim Preserve $1($2)/x;
       s/\bREDIM\s+(\S*?)\[\s*\]\s*;//;
 
-      if (s/\bRETURN\b\s*(.*?);/
-            "$vb_curr_sub = ($1)\nExit Function"/xeg) {
-         if (Fwip_Comment::FWIPC_LINE_LENGTH
-                  <= length("$vb_curr_sub = ($1)")) {
-            s/$vb_curr_sub = /$vb_curr_sub _\n${bq}${bq}= /;
-         }
+      if (s/\bRETURN\b\s*\((.*?)\);/"$vb_curr_sub = $1\nExit Function"/eg) {
+#         if (Fwip_Comment::FWIPC_LINE_LENGTH
+#                  <= length("$vb_curr_sub = ($1)")) {
+#            s/$vb_curr_sub = /$vb_curr_sub _\n${bq}${bq}= /;
+ #        }
       }
 
-      # the ";;" is needed since later we'll strip trailing ";"
-      s/PRINTSTR\s*\((.*)\);/Debug.Print $1;;/;
-      s/PRINTVAL\s*\((.*?)\)\s*;/Debug.Print $1;;/;
+      s/PRINTSTR\s*/Debug.Print/;
+      s/PRINTVAL\s*/Debug.Print/;
 
-      s/\bDAY\b/EARTHSOLARDAY/g;
+      s/\bDAY\b/EARTH_SOLARDAY/g;
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_VBDOTNET)) {
-      # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- -----
+      # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       chomp;
       if (s/ARRAY\s*(\w+)\[\s*\]\s*://) {
          $array_name = $1;
@@ -1213,13 +1244,12 @@ foreach (@input_lines) {
       }
 
       s/\bArray\(/Array.CreateInstance(/g;
-      s/\b0x([0-9A-Fa-f]+)/\&H$1/g;
+      s/\b0x([0-9A-Fa-f]+)/\&H$1&/g;
       s/\b0o([0-7]+)/\&O$1/g;
       s/\b0b([01]+)/\&B$1/g;
       s/^\b(IMPORT\s*\"(.*?)\"\s*;)/$cmout0$1\n/;
       if (m/$rxp_fd/) {
-         my ($ret, $func, $args, $rest)
-               = ($1, $2, $3, $4);
+         my ($ret, $func, $args, $rest) = ($1, $2, $3, $4);
 
          Fwip_Translate::fwipt_ls_inc($_);
 
@@ -1255,24 +1285,35 @@ foreach (@input_lines) {
             . " Shared" . Fwip_Translate::fwipt_vbsub_set($pref)
             . " $func($args)$qq$rest";
       }
-      # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- -----
-      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
+      # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?) *;//s) {
          my ($what, $name, $valu) = ($1, $2, $3);
-         my $ty = "Double";
+         my $ty;
+         if ($valu !~ m/\"/) {
+            $ty = ("Double");
+         } else {
+            $valu =~ s/\"\s+\"/" & "/g;
+            $ty = ("String");
+         }
          $_ = "";
-         my $pp = ($what =~ m/BLOCK_DEF/ ? "Private" : "Public")
-            . " Shared";
+         my $pp;
+         if ($what =~ m/BLOCK_DEF/ or $name =~ m/^(LC_|LX_)/) {
+            $pp = "Private";
+         } else {
+            $pp = "Public";
+         }
+
+         $pp .= " Shared";
          my $cxnamel = funcyaddcnx($name, $what);
          $valu =~ s/SQRT\s*\((.+)\)/($1) ^ 0.5/;
          # VB6 doesnt do self-ref modules
-         $valu =~ s/$package_name\.//g;
+         $valu =~ s/$packagename\.//g;
          $_ = lf_cmadd("$pp Const $name As $ty = $valu");
       }
 
       if (s/(?<!\bAs)(\s*)($rxp_vd)\s+($rxp_an\b)\[(.*)\]
             /${1}Dim $3\[$4\] As $2/xg
-         or
-            s/(?<!\bAs)(\s*)\b($rxp_vd)\s+($rxp_an\b)
+         or s/(?<!\bAs)(\s*)\b($rxp_vd)\s+($rxp_an\b)
                /${1}Dim $3 As $2/xg) {
          my $var = $3;
          s/\s*=(.*)//;
@@ -1281,20 +1322,16 @@ foreach (@input_lines) {
       }
       my $rxp_vdl = "\\bBLOCK_(DBL|STR|INT|BOL)";
       if (s/(?<!\bAs)(\s*)$rxp_vdl\s+($rxp_an\b)\[(.*)\]
-            / "${1}Private $3\[$4\] As $2" /xeg
-         or
-            s/(?<!\bAs)(\s*)\b$rxp_vdl\s+($rxp_vn\b)
+               / "${1}Private $3\[$4\] As $2" /xeg
+               or s/(?<!\bAs)(\s*)\b$rxp_vdl\s+($rxp_vn\b)
                / "${1}Private $3 As $2" /xeg) {
          s/\s*=(.*)//;
 #         s/($rxp_an) Dim/$1/;
       }
 
-      if (s/(?<!\bAs)(\s*)($rxp_vd)\s+
-                  ([a-z_A-Z][a-z_0-9]*\[.*\])
-            /${1}Dim $3 As $2/xg
-         or
-            s/(?<!\bAs)(\s*)\b($rxp_vd)\s+
-                     ([a-z_A-Z][a-z_0-9]*\b)
+      if (s/(?<!\bAs)(\s*)($rxp_vd)\s+([a-z_A-Z][a-z_0-9]*\[.*\])
+               /${1}Dim $3 As $2/xg
+               or s/(?<!\bAs)(\s*)\b($rxp_vd)\s+([a-z_A-Z][a-z_0-9]*\b)
                /${1}Dim $3 As $2/xg) {
          my $var = $3;
          s/\s*(=)(.*)//;
@@ -1306,32 +1343,28 @@ foreach (@input_lines) {
       s/\b%\b/ Mod /xsmg;
       s/\(\s+/(/g;
 
-      s!(\s*)(\S+)\s*([-+/*]|\<\<|\>\>)=(.*)
-         !$1$2 = $2 $3$4!x;
+      s!(\s*)(\S+)\s*([-+/*]|\<\<|\>\>)=(.*)!$1$2 = $2 $3$4!x;
       s/ \>\>/\\ 2 ^/g;
       s/\*\*/^/g;
 
-      s/\bREDIM\s+(\S.*?)\[\s*\],\s*(\S.*);
-            /ReDim Preserve $1\[$2\]/x;
+      s/\bREDIM\s+(\S.*?)\[\s*\],\s*(\S.*);/ReDim Preserve $1\[$2\]/x;
       s/\bREDIM\s+(\S*?)\[\s*\]\s*;//;
 
-      if (s/\bRETURN\b\s*(.*?);/
-            "$vb_curr_sub = ($1)\nExit Function"/xeg) {
-         if (Fwip_Comment::FWIPC_LINE_LENGTH
-                  <= length("$vb_curr_sub = ($1)")) {
-            s/$vb_curr_sub = /$vb_curr_sub _\n${bq}${bq}= /;
-         }
+      if (s/\bRETURN\b\s*\((.*?)\);/"$vb_curr_sub = $1\nExit Function"/eg) {
+#         if (Fwip_Comment::FWIPC_LINE_LENGTH
+#                   <= length("$vb_curr_sub = ($1)")) {
+#            s/$vb_curr_sub = /$vb_curr_sub _\n${bq}${bq}= /;
+#         }
       }
 
       s/PRINTSTR\s*/Debug.Print/g;
       s/PRINTVAL\s*/Debug.Print/;
 
-      s/\bDAY\b/EARTHSOLARDAY/g;
-   } elsif (Fwip_Translate::fwipt_lang_is(LANG_C, LANG_H
-               , LANG_RPN)) {
-      # C - ----- ----- ----- ----- ----- ----- ----- ----- -----
-      # H - ----- ----- ----- ----- ----- ----- ----- ----- -----
-      # RPN ----- ----- ----- ----- ----- ----- ----- ----- -----
+      s/\bDAY\b/EARTH_SOLARDAY/g;
+   } elsif (Fwip_Translate::fwipt_lang_is(LANG_C, LANG_H, LANG_RPN)) {
+      # C - ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+      # H - ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+      # RPN ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       s/$rxp_mn//g;
       if (s/ARRAY\s*(\w+)\[\s*\]\s*://) {
          $array_name = $1;
@@ -1345,8 +1378,7 @@ foreach (@input_lines) {
       while (m/ARRAYLAST\((\w+)\[\s*\]\)/) {
          if (!defined($array_size{$1})) {
             foreach my $ky (keys %array_size) {
-               print STDERR "\narray_size\{$ky\}="
-                     . "$array_size{$ky}";
+               print STDERR "\narray_size\{$ky\}=$array_size{$ky}";
             }
             die "\nC/H/RPN:array_size\{$1\} NOT DEFINED";
          }
@@ -1378,41 +1410,44 @@ foreach (@input_lines) {
          $_ .= "$prt\n{$rest";
       }
       if (s/^\bIMPORT\s*\"(.*?)\"\s*;//) {
-         push(@func_prototype, "#include \"$1.h\"");
+         push(@include_files, "#include \"$1.h\"");
       }
-      # C - ----- ----- ----- ----- ----- ----- ----- ----- -----
-      # H - ----- ----- ----- ----- ----- ----- ----- ----- -----
-      # RPN ----- ----- ----- ----- ----- ----- ----- ----- -----
-      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
+      # C - ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+      # H - ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+      # RPN ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?) *;//s) {
          my ($what, $name, $valu) = ($1, $2, $3);
          my $ty = ($what eq "BLOCK_DEF" ? "long" : "double");
          $_ = "";
          my $cxnamel = funcyaddcnx($name, $what);
          $valu =~ s/\b(SQRT|EXP)\b/\L$1/g;
          $valu =~ s/\bLN\b\s*\(/log(/g;
-         if ($what !~ m/BLOCK_DEF/) {
-            push(@cx_funs
-               , lf_cmadd(sprintf("$ty %s { return ($name); }"
-                  , "$cxnamel(void)"), 1));
-            if (Fwip_Comment::FWIPC_LINE_LENGTH
-                     < length($cx_funs[-1])) {
+         if ($valu =~ m/\"/) {
+            $ty = "const char *";
+            my $cxfn = "$cxnamel(void)";
+            push(@cx_funs, lf_cmadd("$ty $cxfn { return ($name); }", 1));
+            if (Fwip_Translate::fwipt_lang_is(LANG_H)) {
+               push(@c_def, lf_cmadd("#define $name $valu", 1));
+               push(@cx_func_proto, lf_cmadd("$ty $cxfn;"));
+            }
+         } elsif ($what !~ m/BLOCK_DEF/) {
+            push(@cx_funs, lf_cmadd("$ty $cxnamel(void) { return ($name); }"
+                  , 1));
+            if (Fwip_Comment::FWIPC_LINE_LENGTH < length($cx_funs[-1])) {
                $cx_funs[-1] =~ s/(\{) (return)/$1\n${bq}$2/;
             }
             if (Fwip_Translate::fwipt_lang_aint(LANG_C)) {
-               push(@func_prototype, lf_cmadd(
-                     sprintf("#define %s ($valu)", $name), 1));
-               if (Fwip_Comment::FWIPC_LINE_LENGTH
-                        < length($func_prototype[-1])) {
-                  $func_prototype[-1] =~ s/(\#define\s+\S+)
-                        \s+(\S)/$1 \\\n${bq}${bq}$2/x;
-               }
-               push(@cx_func_proto
-                     , lf_cmadd("$ty $cxnamel(void);"));
+               push(@c_def, lf_cmadd(lf_quincy($name, $valu), 1));
+ #              if (Fwip_Comment::FWIPC_LINE_LENGTH < length($c_def[-1])) {
+ #                 $c_def[-1] =~ s/(\#define\s+\S+)\s+(\S)
+ #                       /$1 \\\n${bq}${bq}$2/x;
+ #              }
+               push(@cx_func_proto, lf_cmadd("$ty $cxnamel(void);"));
             }
             $_ = "";
          } else {
             if (Fwip_Translate::fwipt_lang_is(LANG_C)) {
-               $_ = sprintf("#define %s ($valu)", $name);
+               $_ = lf_quincy($name, $valu);
             } else {
                $_ = "";
             }
@@ -1424,10 +1459,9 @@ foreach (@input_lines) {
       s/^\bREDIM\s+($rxp_an)\[\s*\]\s*;/free($1);/;
 
       s/PRINTSTR\s*\((.*)\);/printf("%s", $1);/;
-      s/PRINTVAL\s*\((.*?)\)\s*;
-               /printf("%.18g", (double)$1);/x;
+      s/PRINTVAL\s*\((.*?)\)\s*;/printf("%.18g", (double)$1);/x;
 
-   # BC --- ----- ----- ----- ----- ----- ----- ----- ----- -----
+   # BC --- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_BC)) {
       if (s/ARRAY\s*(\w+)\[\s*\]\s*://) {
          $array_name = $1;
@@ -1449,8 +1483,7 @@ foreach (@input_lines) {
       s/(0b[01]+)/ hex($1) /eg;
       s/0o([0-7]+)/ oct("0" . $1) /eg;
       if (m/$rxp_fd/) {
-         my ($ret, $func, $args, $rest)
-               = ($1, $2, $3, $4);
+         my ($ret, $func, $args, $rest) = ($1, $2, $3, $4);
 
          $func = lc($func);  # BC cant handle upper case
          Fwip_Translate::fwipt_ls_inc($_);
@@ -1468,22 +1501,22 @@ foreach (@input_lines) {
       s/\bREDIM\b.*//;
 
       s/^\b(IMPORT\s*\"(.*?)\"\s*;)/$cmout0$1\n/;
-      # BC  ----- ----- ----- ----- ----- ----- ----- ----- -----
-      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?);//s) {
+      # BC  ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+      if (s/^ *((?:BLOCK_DEF +)?CONST) +(\w+)\b *(\S.*?) *;//s) {
          my ($what, $name, $valu) = ($1, $2, $3);
-         my $cxnamel = funcyaddcnx($name, $what);
-         $valu =~ s/EXP\s*\(/e(/g;
-         $valu =~ s/LN\s*\(/l(/g;
-         $valu =~ s@ATAN2\s*\((.+?),\s*(.+?)\)@a(($1) / ($2))@g;
-         $valu =~ s/(\d+(\.\d+)?)[eE]\+?(-?\d+)/($1 * 10^$3)/g;
-         $valu =~ s/([A-Z0-9_]+\()/ lc($1) /eg;
+         my $cxnamel = funcyaddcnx(lc($name), $what);
+         if ($valu !~ m/\"/) {
+            $valu =~ s/EXP\s*\(/e(/g;
+            $valu =~ s/LN\s*\(/l(/g;
+            $valu =~ s~ATAN2\s*\((.+?),\s*(.+?)\)~a(($1) / ($2))~xg;
+            $valu =~ s/(\d+(\.\d+)?)[eE]\+?(-?\d+)/($1 * 10^$3)/xg;
+            $valu =~ s/([A-Z0-9_]+\()/ lc($1) /eg;
 
-         if ($cxnamel ne $name) {
-#            push(@cx_funs
-#                 , lf_cmadd(sprintf("%s = ($name);"
-#                     , $cxnamel), 1));
+            if ($cxnamel ne $name) {
+#            push(@cx_funs, lf_cmadd("$cxnamel = ($name);", 1));
+            }
+            $_ = lf_cmadd("$cxnamel = $valu;");
          }
-         $_ = lf_cmadd(sprintf("%s = $valu;", $cxnamel));
       }
 
       s/\*\*/^/g;
@@ -1492,18 +1525,15 @@ foreach (@input_lines) {
       s/PRINTVAL\s*\((.*?)\)\s*;/print $1;/;
       my $dlag = 0;
 
-      if (s/BLOCK_(?:INT|DBL|STR|BOL)\s+
-                     ($rxp_an)\[([^\]]+)\]\[([^\]]+)\]
-               /auto $1\[($2 + 1) * $3\]/xg) {
+      if (s/BLOCK_(?:INT|DBL|STR|BOL)\s+($rxp_an)\[([^\]]+)\]\[([^\]]+)\]
+                  /auto $1\[($2 + 1) * $3\]/xg) {
          $bc_2darrdim{$1} = "$3";
          $dlag = 1;
-      } elsif (s/BLOCK_(?:INT|DBL|STR|BOL)
-                  \s+($rxp_an)\[([^\]]*)\]
-               /auto $1\[$2\]/xg) {
+      } elsif (s/BLOCK_(?:INT|DBL|STR|BOL)\s+($rxp_an)\[([^\]]*)\]
+                  /auto $1\[$2\]/xg) {
          $dlag = 1;
-      } elsif (s/BLOCK_(?:INT|DBL|STR|BOL)
-                  \s+(\w+(\s*=.*)?)(?=;)
-               /auto $1/xg) {
+      } elsif (s/BLOCK_(?:INT|DBL|STR|BOL)\s+(\w+(\s*=.*)?)(?=;)
+                  /auto $1/xg) {
          $dlag = 1;
       }
 
@@ -1539,12 +1569,12 @@ foreach (@input_lines) {
    Fwip_Translate::fwipt_ls_next();
    $_ = lf_cmadd($_);
 
-   # PYTHON ----- ----- ----- ----- ----- ----- ----- ----- -----
+   # PYTHON ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
    if (Fwip_Translate::fwipt_lang_is(LANG_PYTHON)) {
       my $zd = "for ii in range";
       # take care of 2D arrays first
       s/^(\s*)(\w+)\[([^\]]+)\]\[([^\]]+)\];
-         /$1$2 = [[0 $zd($4)] $zd($3)];/xg;
+               /$1$2 = [[0 $zd($4)] $zd($3)];/xg;
       s/\b(pass|break|yield);/$1 ;/g;
       s/^\s*\w+;/;/g;
       s/\b(pass|break|yield) ;/$1;/g;
@@ -1553,10 +1583,9 @@ foreach (@input_lines) {
       s/^(\s*\w+)\[\s*\]\s*$/$1 = [0]/g;
       s/(\w+)\[\s*\]/$1/g;
       s/ \* \* / ** /g;
-   # VB6 -- ----- ----- ----- ----- ----- ----- ----- ----- -----
-   # VBDOTNET --- ----- ----- ----- ----- ----- ----- ----- -----
-   } elsif (Fwip_Translate::fwipt_lang_is(LANG_VB6
-               , LANG_VBDOTNET)) {
+   # VB6 -- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+   # VBDOTNET --- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+   } elsif (Fwip_Translate::fwipt_lang_is(LANG_VB6, LANG_VBDOTNET)) {
       if (Fwip_Translate::fwipt_lang_is(LANG_VB6)) {
          # change "var += valu" into "var = var + valu", et al.
          s@(\s*)(\S+)\s*([-+/*]|\<\<|\>\>)=(.*)@$1$2 = $2 $3$4@x;
@@ -1569,29 +1598,28 @@ foreach (@input_lines) {
          \s+($rxp_vn).*/$1 $3 As $2/xg;
 
       s/==/=/g;
-      s/\]\[/, /g;
+      1 while(s/^([^"]*)\b\]\[/$1, /g);
       if (!m/ As (\S+)\[\s*\]/g) {
          s/(?<! As )(\S+)\[\s*\](?! +As )/$1/g;
       }
       s/(\S) +,/$1,/g;
       s/(\S)  +As/$1 As/g;
-      s/\[/(/g;
-      s/\]/)/g;
+      1 while(s/^([^"]*)\[/$1(/g);
+      1 while(s/^([^"]*)\]/$1)/g);
       if (Fwip_Translate::fwipt_current_function_get() eq ""
                and m/\b(Private|Public)\s+/) {
          s/;//g;
          push(@vbglobal_vars, "$_");
          $_ = "";
       }
-   # C ---- ----- ----- ----- ----- ----- ----- ----- ----- -----
-   } elsif (Fwip_Translate::fwipt_lang_is(LANG_C, LANG_H
-               , LANG_RPN)) {
+   # C ---- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+   } elsif (Fwip_Translate::fwipt_lang_is(LANG_C, LANG_H, LANG_RPN)) {
       s/^(\s*double|\s*long) (\w+)\[\s*\];/$1 *$2 = NULL;/g;
       s/(\w+)\[\s*\]/$1/g;
-   # BC --- ----- ----- ----- ----- ----- ----- ----- ----- -----
+   # BC --- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_BC)) {
       s/\[\s*\]\s*=\s*/ = /g;
-   # PERL - ----- ----- ----- ----- ----- ----- ----- ----- -----
+   # PERL - ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_PERL)) {
       s/(my +\w+)\[.*\];/$1;/;
       s/\$(\w+)\[\s*\]/\@$1/g;  # sigils
@@ -1600,11 +1628,10 @@ foreach (@input_lines) {
    }
    #   s/^\s+(\w+|\w+\[\s*\]);\s*$//mg;
 
-   # PYTHON ----- ----- ----- ----- ----- ----- ----- ----- -----
-   # VB6 -- ----- ----- ----- ----- ----- ----- ----- ----- -----
-   # VBDOTNET --- ----- ----- ----- ----- ----- ----- ----- -----
-   if (Fwip_Translate::fwipt_lang_is(LANG_PYTHON, LANG_VB6
-               , LANG_VBDOTNET)) {
+   # PYTHON ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+   # VB6 -- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+   # VBDOTNET --- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+   if (Fwip_Translate::fwipt_lang_is(LANG_PYTHON, LANG_VB6, LANG_VBDOTNET)) {
       s/;$//mg;
       s/;\s*($cmout0)/$1/g;
       s/ \* \* / ** /g;
@@ -1614,8 +1641,8 @@ foreach (@input_lines) {
       if (Fwip_Translate::fwipt_lang_aint(LANG_H, LANG_RPN)) {
          push(@outa, $_);
       }
-      # VB6 ----- ----- ----- ----- ----- ----- ----- ----- -----
-      # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- -----
+      # VB6 ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+      # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       if (Fwip_Translate::fwipt_lang_is(LANG_VB6, LANG_VBDOTNET)
             and $outa[$#outa] =~ m/End Function/
             and $outa[$#outa - 1] =~ m/Exit Function/) {
@@ -1660,8 +1687,7 @@ sub joinrx($ )
             my $suffy = $3;
             my $prerx = $pre;
             $prerx =~ s/(\[|\]|\(|\)|\+|\-)/\\$1/g;
-            while ($ii + 1 <= $#ff
-                  and $ff[$ii + 1] =~ m/^$prerx(.+)$/) {
+            while ($ii + 1 <= $#ff and $ff[$ii + 1] =~ m/^$prerx(.+)$/) {
                $suffy .= "|" . $1;
                splice(@ff, $ii + 1, 1);
             }
@@ -1682,26 +1708,26 @@ sub joinrx($ )
       my $gn = $gg;
       while (($gg =~ s/\(\|d\(\|inv\)\|h\(\|inv\)
                \|inv\|t\(\|inv\)\|\)/[dht]?(inv)?/xg)
-            or ($gg =~ s/\(\|c\(\|inv\|x\(\|inv\)\)\|inv\)
+               or ($gg =~ s/\(\|c\(\|inv\|x\(\|inv\)\)\|inv\)
                /[cx]?\(inv\)?/xg)
-            or ($gg =~ s/d\(inv\)\?\|h\(inv\)\?
+               or ($gg =~ s/d\(inv\)\?\|h\(inv\)\?
                \|inv\|t\(inv\)\?/[dht]?(inv)?/xg)
-            or ($gg =~ s/\(\|([^()]+)\)/($1)?/g)
-            or ($gg =~ s/\(\|([^()]*\([^()]+\)[^()]*)\)/($1)?/g)
-            or ($gg =~ s/\(([^()]+)\|\)/($1)?/g)
-            or ($gg =~ s/\?{2,}/?/g)
-            or ($gg =~ s/\((.)\)/$1/g)
-            or ($gg =~ s/\((\w+)\)([^?*+])/$1$2/g)
-            or ($gg =~ s/\(([^|()]+?)(.+)
+               or ($gg =~ s/\(\|([^()]+)\)/($1)?/g)
+               or ($gg =~ s/\(\|([^()]*\([^()]+\)[^()]*)\)/($1)?/g)
+               or ($gg =~ s/\(([^()]+)\|\)/($1)?/g)
+               or ($gg =~ s/\?{2,}/?/g)
+               or ($gg =~ s/\((.)\)/$1/g)
+               or ($gg =~ s/\((\w+)\)([^?*+])/$1$2/g)
+               or ($gg =~ s/\(([^|()]+?)(.+)
                   \|([^|()]+?)\2
                   \|([^|()]+?)\2\)/($1|$3|$4)($2)/xg)
-            or ($gg =~ s/\(([^|()]+?)(.+)\|([^|()]+?)\2\)\
+               or ($gg =~ s/\(([^|()]+?)(.+)\|([^|()]+?)\2\)\
                   /($1|$3)($2)/xg)
-            or ($gg =~ s/\((.)\|(.)\|(.)\)/[$1$2$3]/g)
-            or ($gg =~ s/\((.)\|(.)\)/[$1$2]/g)
-            or ($gg =~ s/\|(.)\|(.)\)/|[$1$2])/g)
-            or ($gg =~ s/\((.)\|(.)\|(.)\|/([$1$2$3]|/g)
-            or ($gg =~ s/\((.)\|(.)\|/([$1$2]|/g)
+               or ($gg =~ s/\((.)\|(.)\|(.)\)/[$1$2$3]/g)
+               or ($gg =~ s/\((.)\|(.)\)/[$1$2]/g)
+               or ($gg =~ s/\|(.)\|(.)\)/|[$1$2])/g)
+               or ($gg =~ s/\((.)\|(.)\|(.)\|/([$1$2$3]|/g)
+               or ($gg =~ s/\((.)\|(.)\|/([$1$2]|/g)
             ) {
          my ($po, $pc) = (($gg =~ y/(/(/), ($gg =~ y/)/)/));
          if ($po != $pc) {
@@ -1755,7 +1781,7 @@ sub lf_wrapit($$$ )
    $totalout;
 }
 
-# Assemble the description function ----- ----- ----- ----- -----
+# Assemble the description function ----- ----- ----- ----- ----- ----- -----
 
 my $descs_code = "";
 my $descl_code = "";
@@ -1776,8 +1802,7 @@ if (Fwip_Translate::fwipt_lang_aint(LANG_UNITS, LANG_VARYLOG)) {
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_BC)) {
       ($deb, $dee, $det) = ("print \"", "\";", "\\n");
       $mlmmm -= 0;#14;
-   } elsif (Fwip_Translate::fwipt_lang_is(LANG_VB6
-               , LANG_VBDOTNET)) {
+   } elsif (Fwip_Translate::fwipt_lang_is(LANG_VB6, LANG_VBDOTNET)) {
       ($deb, $dee) = ("${bq}${bq}& \"", "\" _");
       $det = "${bq}${bq}& vbNewLine";
    } else {
@@ -1791,9 +1816,8 @@ if (Fwip_Translate::fwipt_lang_aint(LANG_UNITS, LANG_VARYLOG)) {
    my $mlm = $mlmm - $delen + 1;
    foreach my $args (0..$#funcy_args) {
       $descl_arr[$args] = " ";
-      if (defined($funcy_args[$args])
-            and $funcy_args[$args] =~ m/./) {
-         my $subb = "$package_name ";
+      if (defined($funcy_args[$args]) and $funcy_args[$args] =~ m/./) {
+         my $subb = "$packagename ";
          my $ff = $funcy_args[$args];
          $ff =~ s/^ //;
          if ($args == 0) {
@@ -1802,17 +1826,16 @@ if (Fwip_Translate::fwipt_lang_aint(LANG_UNITS, LANG_VARYLOG)) {
             $subb .= ($args - 1) . "-ary Functions";
          }
          my $fillets = "${bq}$subb: " . joinrx($ff);
-         my $filleta = join(" ", sort { lc($a) cmp lc($b) }
-               split(/ +/, $ff));
+         my $filleta = join(" ", sort { lc($a) cmp lc($b)} split(/ +/, $ff));
          my $filletl = "${bq}$subb: $filleta";
 
          foreach ($fillets, $filletl, $filleta) {
             s/(.{1,$mlm})/${bq}$deb$1$dee\n/g;
-            # VBDOTNET  ----- ----- ----- ----- ----- ----- -----
-            # VB6 ----- ----- ----- ----- ----- ----- ----- -----
-            if (Fwip_Translate::fwipt_lang_is(LANG_VB6
-                     , LANG_VBDOTNET)) {
-               s/$dd\n$/$dee\n${bq}$det\n/;
+            # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- ----- -----
+            # VB6 ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+            if (Fwip_Translate::fwipt_lang_is(LANG_VB6, LANG_VBDOTNET)) {
+#               s/$dd\n$/$dee\n${bq}$det\n/;
+               s/$dd\n$/" & vbNL\n/;
             } else {
                s/$dd$/$dee\n${bq}$deb$det$dee\n/;
             }
@@ -1831,11 +1854,12 @@ $descs_code =~ s/"[^"]+$/"/;
 $descl_code =~ s/^\n//;
 $descl_code =~ s/"[^"]+$/"/;
 
-foreach my $pp (@outa, @func_prototype, @cx_func_proto) {
+foreach my $pp (@outa, @include_files, @c_def, @func_prototype
+         , @cx_func_proto) {
    my @qq = split(/\n/, $pp);
    foreach (@qq) {
       my ($aa, $bb);
-      if (m/^(.*?)($cmfwip0.*)/) {
+      if (m/^(.*?)($lv_cm0.*)/) {
          ($aa, $bb) = ($1, $2);
       } else {
          ($aa, $bb) = ($_, "");
@@ -1849,9 +1873,17 @@ my $txt = "${lcpn}_description";
 my $desc_pre = Fwip_Comment::fwipc_comm("Description", $txt);
 chomp($desc_pre);
 
+sub unshift_outa($@ )
+{
+   my ($title, @aa) = @_;
+   if (0 <= $#aa) {
+      unshift(@outa, Fwip_Comment::fwipc_comm($title, $lang_name), @aa);
+   }
+}
+
 if (Fwip_Translate::fwipt_lang_is(LANG_UNITS)) {
 } elsif (Fwip_Translate::fwipt_lang_is(LANG_VARYLOG)) {
-# PERL ---- ----- ----- ----- ----- ----- ----- ----- ----- -----
+# PERL ---- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
 } elsif (Fwip_Translate::fwipt_lang_is(LANG_PERL)) {
    # do not attempt to export language defined functions
    my $ee = join(" ", grep {
@@ -1860,8 +1892,7 @@ if (Fwip_Translate::fwipt_lang_is(LANG_UNITS)) {
       } keys %funcy_names);
    my $hh = join(" ", sort (split(/ +/, $ee)));
    $hh =~ s/^ +//;
-   my $export_list = lf_wrapit(Fwip_Comment::FWIPC_LINE_LENGTH
-         , ${bq}, $hh);
+   my $export_list = lf_wrapit(Fwip_Comment::FWIPC_LINE_LENGTH, ${bq}, $hh);
 
    unshift(@outa, <<EndOfExportPerl, @func_prototype);
 \@EXPORT_OK = ( qw(
@@ -1880,13 +1911,13 @@ sub ${lcpn}_desc() {
 $descs_code;
 }
 EndOfDescPerl
-# C - ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
-} elsif (Fwip_Translate::fwipt_lang_is(LANG_C, LANG_H
-            , LANG_RPN)) {
-   # C ---- ----- ----- ----- ----- ----- ----- ----- ----- -----
-   # H ---- ----- ----- ----- ----- ----- ----- ----- ----- -----
-   # RPN -- ----- ----- ----- ----- ----- ----- ----- ----- -----
+# C - ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+} elsif (Fwip_Translate::fwipt_lang_is(LANG_C, LANG_H, LANG_RPN)) {
+   # C ---- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+   # H ---- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+   # RPN -- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
    if (Fwip_Translate::fwipt_lang_is(LANG_C)) {
+      @c_def = ();
       @func_prototype = ();
       @cx_func_proto = ();
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_RPN)) {
@@ -1903,7 +1934,8 @@ EndOfDescPerl
       }
       @outa = ();
       my @outp = ();
-      foreach my $pp (@cx_func_proto, @func_prototype) {
+      foreach my $pp (@include_files, @cx_func_proto, @c_def
+                  , @func_prototype) {
          if ($pp =~ m@^//@) {
             push(@outa, $_);
          } elsif ($pp =~ m@^(bool|long|double)@) {
@@ -1911,8 +1943,7 @@ EndOfDescPerl
             $pp =~ s/\n//smg;
             $pp =~ s/\s+/ /msg;
             $pp =~ s/\s+,/,/msg;
-            if ($pp =~ m/^([a-z]+)\s+
-                     ([A-Za-z]\w+)\((.*)\);/x) {
+            if ($pp =~ m/^([a-z]+)\s+([A-Za-z]\w+)\((.*)\);/x) {
                my ($ret, $name, $args) = ($1, $2, $3);
                next if ($name =~ m/^lf_/);
                my $fi = "";
@@ -1920,13 +1951,16 @@ EndOfDescPerl
                   $fi .= uc($1) if ($ar =~ m/(\S)/);
                }
                $ret = uc($1) if ($ret =~ m/(\S)/);
-               next if ($fi =~ m/C/);
-               $fi =~ s/[VN]+$//g;
-               $fi = "F_RPN_${ret}_$fi";
-               push(@outp, "{$fi, \"$name\", $name},");
+               if ($fi =~ m/C/) {
+                  next; # func has const array args
+               }
+               $fi =~ s/[VN]+$//g; # rm void and null args
+               $fi = "RPN_${ret}_$fi";
+               push(@outp, "{$fi, \"$name\", {$name}},");
                if ($name =~ m/^cx(.*)/) {
-                  my $uname = uc($1);
-                  push(@outp, "{$fi, \"$uname\", $name},");
+                  my $uname = ($1);   # uc($1)
+                  push(@outp, "{RPN_C_, \"$uname\","
+                        . " {.dbl = $uname}},");
                }
             }
          }
@@ -1935,24 +1969,26 @@ EndOfDescPerl
          sort {$a->[0] cmp $b->[0]}
          map {[get_key($_),$_]; } @outp;
       @cx_func_proto = ();
-   } elsif (Fwip_Translate::fwipt_lang_is(LANG_H)
-               and $descs_code =~ m/\S/) {
+   } elsif (Fwip_Translate::fwipt_lang_is(LANG_H) and $descs_code =~ m/\S/) {
       push(@outa, (<<EndOfDescC));
 $desc_pre
-#define ${package_name}_DESCRIPTION \\
+#define ${packagename}_DESCRIPTION \\
 $descl_code
-#define ${package_name}_DESC \\
+#define ${packagename}_DESC \\
 $descs_code
 EndOfDescC
    }
-   foreach (@outa, @cx_func_proto, @func_prototype,) {
+   foreach (@outa, @c_def, @func_prototype, @cx_func_proto) {
       for my $ii (qw(double int long)) {
          s/(\s*$ii\s)($rxp_an)\[0\]/$1*$2 = NULL/x;
       }
    }
-   unshift(@outa, @cx_func_proto, @func_prototype);
+   unshift_outa("FUNC_PROTOTYPE", @func_prototype);
+   unshift_outa("CX_FUNC_PROTO", @cx_func_proto);
+   unshift_outa("C_DEF", @c_def);
+   unshift_outa("INCLUDE", @include_files);
 } elsif (Fwip_Translate::fwipt_lang_is(LANG_PYTHON)) {
-   # PYTHON ----- ----- ----- ----- ----- ----- ----- ----- -----
+   # PYTHON ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
    my %consts = ();
    chomp($descs_code);
    chomp($descl_code);
@@ -1968,7 +2004,7 @@ $descs_code
 )
 EndOfDescPython
 } elsif (Fwip_Translate::fwipt_lang_is(LANG_BC)) {
-   # BC --- ----- ----- ----- ----- ----- ----- ----- ----- -----
+   # BC --- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
    chomp($descs_code);
    chomp($descl_code);
    push(@outa, <<EndOfDescBC);
@@ -1994,27 +2030,24 @@ EndOfDescBC
       "${aa[0]}[$bc_2darrdim{$aa[0]} * $aa[1] + $aa[2]]";
    }
    foreach (@outa) {
-      if (m/(\w+)\[([^\]]+)\]\[([^\]]+)\]/
-               and defined($bc_2darrdim{$1})) {
+      if (m/(\w+)\[([^\]]+)\]\[([^\]]+)\]/ and defined($bc_2darrdim{$1})) {
          s/(\w+)\[([^\]]+)\]\[([^\]]+)\]/toind($1,$2,$3)/eg;
       }
       # replace uppercase names w/ lowercase equivalents
-#      while (s/^([^#"]*)\b((?!<\.)[A-Z]\w+)\b(?!\()
-#               /${1}cx\L$2/xm) {
-#         next;
-#      }
+      while (s/^([^#"]*)\b(?!<\.)(\w*[A-Z]\w+)\b(?!\()/${1}cx\L$2/xm) {
+         next;
+      }
       s/^((cx\w+) = \(\2\);)/# $1/mg;
    }
-} elsif (Fwip_Translate::fwipt_lang_is(LANG_VB6
-         , LANG_VBDOTNET)) {
-   # VBDOTNET --- ----- ----- ----- ----- ----- ----- ----- -----
-   # VB6 -- ----- ----- ----- ----- ----- ----- ----- ----- -----
+} elsif (Fwip_Translate::fwipt_lang_is(LANG_VB6, LANG_VBDOTNET)) {
+   # VBDOTNET --- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+   # VB6 -- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
    # VisualBasic has a ridiculous limit on line continuations
    my $vbd = "desc_string";
 
    foreach ($descs_code, $descl_code) {
       s/^(.*:)/${bq}$vbd = $vbd _\n$1/mg;
-      s/((.*\s_\n){4})/${bq}$vbd = $vbd _\n$1/mg;
+      s/((.*\s_\n){12})/${bq}$vbd = $vbd _\n$1/mg;
       s/ _(\n\s+$vbd)/$1/mg;
       s/\s*_$//sg;
       s/^\s+$vbd = $vbd\n//mg;
@@ -2040,7 +2073,7 @@ End Function
 
 EndOfDescVB
 
-   foreach (@outa) {
+   foreach (@outa, @vbglobal_vars, @cx_funs) {
       s/\"\\t\"/vbTab/g;
       s/\"\\n\"/vbLf/g;
       s/\"\\r\"/vbCr/g;
@@ -2049,44 +2082,33 @@ EndOfDescVB
 
 my @currtime = (localtime());
 my $varylog_curr = sprintf("%s %4.4d-%2.2d-%2.2d kdw "
-   , $cmout0, $currtime[5] + 1900, $currtime[4] + 1
-   , $currtime[3]);
+         , $cmout0, $currtime[5] + 1900, $currtime[4] + 1
+         , $currtime[3]);
 
 if (Fwip_Translate::fwipt_lang_is(LANG_VARYLOG)) {
    @varylog_block = reverse sort @varylog_block;
    @outa = (@varylog_block);
 } else {
-   if (0 <= $#vbglobal_vars) {
-      unshift(@outa
-         , Fwip_Comment::fwipc_comm("Global-Variables"
-               , $lang_name)
-         , @vbglobal_vars);
-   }
-   if (0 <= $#cx_funs) {
-      unshift(@outa
-         , Fwip_Comment::fwipc_comm("Constant", $lang_name)
-            , @cx_funs);
-   }
+   unshift_outa("Global-Variables", @vbglobal_vars);
+   unshift_outa("Constant", @cx_funs);
+
    unshift(@outa
-      , "$varylog_curr For Changelog, See File "
-            . "$package_name\.varylog"
-      , Fwip_Translate::fwipt_initcode($package_name));
+      , "$varylog_curr For Changelog, See File $packagename\.varylog"
+      , Fwip_Translate::fwipt_initcode($packagename));
 
    my $end_code_block = "";
 
    if (Fwip_Translate::fwipt_lang_is(LANG_PERL)) {
-      # PERL ---- ----- ----- ----- ----- ----- ----- ----- -----
+      # PERL ---- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       $end_code_block = "1; $cmout0 Final return value";
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_H)) {
-      # H - ----- ----- ----- ----- ----- ----- ----- ----- -----
-      $end_code_block
-         = "#endif $cmout0 #ifndef INCLUDED_${package_name}_h";
+      # H - ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+      $end_code_block = "#endif $cmout0 #ifndef INCLUDED_${packagename}_h";
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_RPN)) {
-      # RPN ----- ----- ----- ----- ----- ----- ----- ----- -----
-      $end_code_block
-         = "#endif $cmout0 #ifndef INCLUDED_${package_name}_rpn";
+      # RPN ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+      $end_code_block = "#endif $cmout0 #ifndef INCLUDED_${packagename}_rpn";
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_VBDOTNET)) {
-      # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- -----
+      # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       $end_code_block = "End Class";
    }
 
@@ -2096,8 +2118,7 @@ if (Fwip_Translate::fwipt_lang_is(LANG_VARYLOG)) {
 }
 
 my $curr_year = $currtime[5] + 1900;
-unshift(@outa
-      , "$cmout4 Copyright (C) $curr_year by Kevin D. Woerner");
+unshift(@outa, "$cmout4 Copyright (C) $curr_year by Kevin D. Woerner");
 
 if (Fwip_Translate::fwipt_lang_is(LANG_BC)) {
    # join together all var decls into one decl.
@@ -2150,14 +2171,13 @@ foreach (@outb) {
    die $_ if (m/\binv\?/);
    s/ \+= -([0-9]+)\)/ -= $1)/g;
    if (Fwip_Translate::fwipt_lang_is(LANG_C)) {
-      # C - ----- ----- ----- ----- ----- ----- ----- ----- -----
+      # C - ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       s/\b(cx\w*)/$1()/g;
       s/\(\)\(/(/g;
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_BC)) {
-      # BC  ----- ----- ----- ----- ----- ----- ----- ----- -----
+      # BC  ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       if ($funcy_bcrx =~ m/./) {
-         while (s/^([^#]*[^|0-9a-zA-Z_])($funcy_bcrx)\b
-               /$1cx\L$2/gmx) {
+         while (s/^([^#]*[^|0-9a-zA-Z_])($funcy_bcrx)\b/$1cx\L$2/gmx) {
          }
       }
 #      s/^([^#]*)\b([A-Z_][A-Z_]+)\b/$1cx\L$\2/g;
@@ -2165,24 +2185,24 @@ foreach (@outb) {
          s/$rxp_mn(\w+)/\L$1/g;
       }
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_VBDOTNET)) {
-      # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- -----
+      # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       s/\bPrivate Dim /Private Shared /g;
       s/Private lv_/Private Shared lv_/g;
       s/ Shared Shared/ Shared/g;
       s/ Shared Const / Const /g;
 #      s/Private( Shared \w+\()/Friend $1/g;
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_PERL)) {
-      # PERL ---- ----- ----- ----- ----- ----- ----- ----- -----
+      # PERL ---- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
       if (m/^[^#]*$rxp_mn/) {
          s/($rxp_mn)/${1}::/g;
          s/\.::/::/g;
       }
    } elsif (Fwip_Translate::fwipt_lang_is(LANG_PYTHON)) {
-      # PYTHON -- ----- ----- ----- ----- ----- ----- ----- -----
-      s/\b$package_name\.\b//g;
+      # PYTHON -- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+      s/\b$packagename\.\b//g;
    }
 
-# --- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+# --- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
    my $gh;
    do {
       $gh = s@\B(\(\d+\s*[-+/*]\s*-?\d+\))@ eval($1) @eg;
@@ -2195,10 +2215,9 @@ foreach (@outb) {
          $gh++;
       }
 
-      $gh += s@\b(\((\d+\ [-+/*]\ )+-?\d+\s*\))
-            @ "(" . eval($1) . ")" @xeg;
+      $gh += s@\b(\((\d+\ [-+/*]\ )+-?\d+\s*\))@ "(" . eval($1) . ")" @xeg;
       $gh += s/(\ [+-]\ \d+\ [-\+]\ -?\d+\s*)([\]\),;])
-            / " + " . eval($1) ." $2" /xeg;
+               / " + " . eval($1) ." $2" /xeg;
       $gh += s/ [+-] 0\s*\)/)/g;
       $gh += s/(\S) +,/$1,/g;
       $gh += s/([,=])\s+([+-])\s+(\d)/$1 $2$3/g;
@@ -2215,24 +2234,23 @@ foreach (@outb) {
       } elsif (s@^(\s*$cmout0\s)\s+@$1@) {
       } else {
          m/^(\s*)/;
-         my $lead = "$1${bq}";
+         my $lead = "$1${bq}${bq}${bq}";
          my $new = "";
          my $cont = "";
-         if (Fwip_Translate::fwipt_lang_is(LANG_VB6
-                     , LANG_VBDOTNET)) {
-            # VBDOTNET  ----- ----- ----- ----- ----- ----- -----
-            # VB6 ----- ----- ----- ----- ----- ----- ----- -----
+         if (Fwip_Translate::fwipt_lang_is(LANG_VB6, LANG_VBDOTNET)) {
+            # VBDOTNET  ----- ----- ----- ----- ----- ----- ----- ----- -----
+            # VB6 ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
             $cont = " _";
          } elsif (Fwip_Translate::fwipt_lang_is(LANG_BC)) {
-            # BC  ----- ----- ----- ----- ----- ----- ----- -----
+            # BC  ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
             $cont = "\\";
-         } elsif (Fwip_Translate::fwipt_lang_is(LANG_C, LANG_H
-                  , LANG_UNITS, LANG_PYTHON, LANG_RPN)) {
-            # C - ----- ----- ----- ----- ----- ----- ----- -----
-            # H - ----- ----- ----- ----- ----- ----- ----- -----
-            # RPN ----- ----- ----- ----- ----- ----- ----- -----
-            # UNITS --- ----- ----- ----- ----- ----- ----- -----
-            # PYTHON -- ----- ----- ----- ----- ----- ----- -----
+         } elsif (Fwip_Translate::fwipt_lang_is(LANG_C, LANG_H, LANG_UNITS
+                  , LANG_PYTHON, LANG_RPN)) {
+            # C - ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+            # H - ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+            # RPN ----- ----- ----- ----- ----- ----- ----- ----- ----- -----
+            # UNITS --- ----- ----- ----- ----- ----- ----- ----- ----- -----
+            # PYTHON -- ----- ----- ----- ----- ----- ----- ----- ----- -----
             $cont = "\\";
          }
          my $cxc = 0;
@@ -2249,7 +2267,7 @@ foreach (@outb) {
                push(@outc, $df);
                $_ = "$ch$_";
                s/^ +//;
-               $_ = "$lead${bq}$_";
+               $_ = "$lead$_";
             } else {
                #die "UNBREAKABLE-LONG-LINE:"
                #      . length($_) . ":$_\n";
@@ -2281,7 +2299,7 @@ if (Fwip_Translate::fwipt_lang_is(LANG_BC)) {
       s/ \+(\(?[0-9])/ $1/g;
       s/\( *\+ */(/g;
       s/, +/,/g;
-      s/([A-Z]\w*?)\(/\L$1(/g;
+      s/(\w*[A-Z]\w*?)\(/\L$1(/g;
       s/^( *(cx\w+) *= *\(\2\);.*)/#$1/gm;
    }
 }

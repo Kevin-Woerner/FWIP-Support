@@ -1,5 +1,6 @@
 #! /bin/bash
-#    Copyright (C) 2016-2019 by Kevin D. Woerner
+#    Copyright (C) 2016-2021 by Kevin D. Woerner
+# 2021-03-07 kdw  updated
 # 2019-09-17 kdw  rmed c[n]v_db[l]2i32
 # 2019-07-26 kdw  oops
 # 2019-06-27 kdw  use alg2rpn; split long pipe
@@ -34,8 +35,6 @@ if [[ -n "$1" ]] ; then
    shift
 fi
 
-. ./.vb_run.sh
-
 rm -rf $temp_file
 for fn in fmodu modulo ddist dist fmod mods \
             floor2 ceil2 round2 ; do
@@ -47,7 +46,7 @@ done
 
 echo "0func lang .x .y +x,+y +x,-y -x,+y -x,-y" > $temp_file.2
 
-./.evaluate.sh $temp_file |
+cat $temp_file | fwe |
    colu 3,1,4,c5+0.0 -i" +" -f"%.8g" |
    perl -pe "s/^\(//;s/\(.*\)//;s@=@ $xx $yy@;s/^[^a-z]+//" |
    sew "\\S+( +\\S+){3}" >> $temp_file.2

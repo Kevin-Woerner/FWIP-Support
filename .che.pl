@@ -1,5 +1,6 @@
 #! /usr/bin/perl -W
-#    Copyright (C) 2015-2019 by Kevin D. Woerner
+#    Copyright (C) 2015-2021 by Kevin D. Woerner
+# 2021-04-23 kdw  macro renam
 # 2019-12-06 kdw  rmed Kd[p]w_St[a]t
 # 2019-11-08 kdw  file order
 # 2019-11-06 kdw  H file work
@@ -54,7 +55,7 @@ sub ready($ )
          redo unless eof(FH);
       }
       $_ = $dd;
-      if (s/\{F_RPN_._[A-Z0-9]{3}, "((cx)?$n_rx)".*/$1/) {
+      if (s/\{RPN_._[A-Z0-9]{3}, "((cx)?$n_rx)".*/$1/) {
          $line .= " $_";
       } elsif (s/^((cx)?$n_rx) += .*/$1/) {
          # BC / PYTHON

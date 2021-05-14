@@ -1,5 +1,6 @@
 #! /bin/bash
-#    Copyright (C) 2017-2020 by Kevin D. Woerner
+#    Copyright (C) 2017-2021 by Kevin D. Woerner
+# 2021-03-09 kdw  tm-const added
 # 2020-03-25 kdw  added 2th and 3th arguments
 # 2020-03-24 kdw  script name errors
 # 2020-03-17 kdw  minor refactor
@@ -93,6 +94,7 @@ Module=Kw; $VBDOS_KWDIR\\Kw.bas
 Module=Kwsun; $VBDOS_KWDIR\\Kwsun.bas
 Module=Kwplanets; $VBDOS_KWDIR\\Kwplanets.bas
 Module=Kwelements; $VBDOS_KWDIR\\Kwelements.bas
+Module=Tm_Const; $VBDOS_KWDIR\\Tm_Const.bas
 Startup="${bsnm}"
 HelpFile=""
 Title="${bsnm}"

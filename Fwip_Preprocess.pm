@@ -1,5 +1,7 @@
 package Fwip_Preprocess;
-#    Copyright (C) 2018-2020 by Kevin D. Woerner
+#    Copyright (C) 2018-2021 by Kevin D. Woerner
+# 2021-02-26 kdw  string work
+# 2021-02-14 kdw  old macro code rmed
 # 2020-12-04 kdw  rm excess space from macros
 # 2020-11-29 kdw  rm debugging code
 # 2020-11-28 kdw  macro syntax overhaul
@@ -59,8 +61,6 @@ sub fwippp_preprocess(;$ )
    }
 
    my %ift_seen = ();
-   my $ppqm_beg = quotemeta("?");
-   my $ppqm_end = quotemeta("?");
    my $ift = "\\{INSERT_FILE\\s*\\\"(.*?)\\\"\\s*\\}";
    while ($slurp =~ m/$ift/) {
       my $filenam = ($1);
@@ -148,11 +148,7 @@ sub fwippp_preprocess(;$ )
       }
    }
 
-   $slurp =~ s/([^A-Za-z0-9_])\(([A-Za-z0-9_]+)\)/$1$2/g;
-
-   if ($slurp =~ m/(${ppqm_beg}[A-Z]+.*?;)/) {
-      die "Preprocess Failure:\n$slurp\nCode contains $1";
-   }
+   $slurp =~ s/^([^"]*[^A-Za-z0-9_"])\(([A-Za-z0-9_]+)\)/$1$2/mg;
 
    $slurp =~ s/\n\n+/\n\n/g;
 

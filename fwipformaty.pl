@@ -1,5 +1,10 @@
 #! /usr/bin/perl -W
-#    Copyright (C) 2020 by Kevin D. Woerner
+#    Copyright (C) 2020-2021 by Kevin D. Woerner
+# 2021-04-23 kdw  updated token name
+# 2021-04-14 kdw  indent for line break
+# 2021-04-12 kdw  minor tweak
+# 2021-03-21 kdw  work
+# 2021-03-04 kdw  allow a-z in const names
 # 2020-08-21 kdw  block-func work
 # 2020-07-24 kdw  s/LO[C]AL_/BL[O]CK_/
 # 2020-06-22 kdw  simplified
@@ -61,7 +66,7 @@ while (<>) {
       my ($ln, $ty, $rest) = ($1, $2, $3);
       $ty -= $first_ind;
       if (!defined($kw[$ty])) {
-         for (my $ii=0; $ii <= $#kw; $ii++) {
+         for (my $ii = 0; $ii <= $#kw; $ii++) {
             print STDERR "KW[$ii]=$kw[$ii]\n";
          }
          die "SORRY: kw[$ty] not defined\n"
@@ -81,7 +86,7 @@ while (<>) {
          $output_line_flag++;
       } elsif ($rest =~ m/^#/) {
          $output_line_flag++;
-      } elsif ($desc =~ m/INDENT_TOKEN/) {
+      } elsif ($desc =~ m/\bINDENT_TK\b/) {
          $next_indent = $curr_indent + 1;
          $output_line_flag++;
       } elsif ($rest =~ m/^ELSE$/ or $rest =~ m/^ELSIF$/) {
@@ -92,6 +97,8 @@ while (<>) {
          $output_line_flag++;
       }
       if ($output_line_flag) {
+         $out =~ s/([0-9]+E[+-])0+\B/$1/g;
+         $out =~ s/([0-9]+)E[+-]0+\b/$1/g;
          $out =~ s/^ //;
          $out =~ s/ +([],;:])/$1/g;
          $out =~ s/ *\[ */[/g;
@@ -100,16 +107,11 @@ while (<>) {
          $out =~ s/\(- +/(-/g;
          $out =~ s/\(\+ */(/g;
          if ($out =~ s/\b +\(/(/g) {
-            $out =~ s/\b(RETURN|IF|WHILE|AWAIT|AND|OR|XOR)\(
-                  /$1 (/gx;
-            $out =~ s/\b(CONST\s+[A-Z_0-9]+)\(/$1 (/gx;
+            $out =~ s/\b(RETURN|IF|WHILE|AWAIT|AND|OR|XOR)\(/$1 (/gx;
+            $out =~ s/\b(CONST\s+[A-Z_0-9a-z]+)\(/$1 (/gx;
          }
          $out =~ s/( = [-+]) /$1/g;
          my $pref = (${bq} x $curr_indent);
-         if ($out =~ m/FUNC .*?(\w+)\(/) {
-            push(@out_arr, Fwip_Comment::fwipc_comm("Function"
-                  , $1, $pref));
-         }
 
          push(@out_arr, "$pref$out\n");
          $curr_indent = $next_indent;
@@ -117,7 +119,7 @@ while (<>) {
       }
    }
 }
-
+=pod
 for (my $ii = 0; $ii < $#out_arr; $ii++) {
    if ($out_arr[$ii] =~ m/^ *((BLOCK_)?CONST)/
             and $out_arr[$ii + 1] =~ m/^ *(#\S+)$/) {
@@ -129,4 +131,5 @@ for (my $ii = 0; $ii < $#out_arr; $ii++) {
       $out_arr[$ii + 1] =~ s/^ *//;
    }
 }
+=cut
 print join("", @out_arr);

@@ -1,5 +1,7 @@
 package Fwip_Comment;
-#    Copyright (C) 2017-2020 by Kevin D. Woerner
+#    Copyright (C) 2017-2021 by Kevin D. Woerner
+# 2021-04-14 kdw  rep char changed
+# 2021-03-05 kdw  upped line length to 77
 # 2020-06-18 kdw  optional arg added to fwi[p]c_comm
 # 2019-12-09 kdw  rmed unused "use"s, exporter
 # 2019-06-28 kdw  comment changed
@@ -17,7 +19,7 @@ package Fwip_Comment;
 # 2017-03-28 kdw  created
 use strict;
 
-sub FWIPC_LINE_LENGTH()   { 65; }
+sub FWIPC_LINE_LENGTH()   { 77; }
 
 sub FWIPC_CM0 () { "#"; }
 sub FWIPC_CM4 () { FWIPC_CM0 . "   "; }
@@ -55,7 +57,7 @@ sub FWIPC_CM4 () { FWIPC_CM0 . "   "; }
       my $rr = " $txt #";
       my $nn = FWIPC_LINE_LENGTH - length($ss . $rr);
 
-      my $ret = $ss . ("-" x $nn) . "$rr\n";
+      my $ret = $ss . ("#" x $nn) . "$rr\n";
    }
 }
 

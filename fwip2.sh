@@ -1,5 +1,6 @@
 #! /bin/bash
-#    Copyright (C) 2019-2020 by Kevin D. Woerner
+#    Copyright (C) 2019-2021 by Kevin D. Woerner
+# 2021-05-13 kdw  program name change
 # 2020-05-13 kdw  trivial change wrt lang
 # 2019-12-27 kdw  lowercase input
 # 2019-09-24 kdw  refactor
@@ -46,7 +47,7 @@ fi
 in_file=
 if [ -e "$input_file.fwipp" ] ; then
    in_file="$input_file.fwipp"
-   fwip-translator --$suff -n$input_file $in_file
+   fwiptranslator --$suff -n$input_file $in_file
 else
    if [ -e "$input_file.fwip" ] ; then
       in_file="$input_file.fwip"
@@ -55,8 +56,8 @@ else
    else
       usage "Unable to find input file:$input_file*"
    fi
-   fwip-preprocess $in_file |
-         fwip-parse |
-         fwip-formatter |
-         fwip-translator --$suff -n$input_file
+   fwippreprocess $in_file |
+         fwip.tab |
+         fwipformaty |
+         fwiptranslator --$suff -n$input_file
 fi
